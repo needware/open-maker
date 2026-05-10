@@ -61,7 +61,6 @@ import {
   validateBaseUrl,
 } from './connectionTest.js';
 import { listProviderModels } from './providerModels.js';
-import { importClaudeDesignZip } from './claude-design-import.js';
 import {
   finalizeDesignPackage,
   FinalizePackageLockedError,
@@ -127,6 +126,7 @@ import { buildMcpInstallPayload } from './mcp-install-info.js';
 import {
   buildProjectArchive,
   buildBatchArchive,
+  createScratchProjectDir,
   decodeMultipartFilename,
   deleteProjectFile,
   detectEntryFile,
@@ -142,6 +142,7 @@ import {
   searchProjectFiles,
   writeProjectFile,
 } from './projects.js';
+import { addRecent as addRecentProject, listRecent as listRecentProjects } from './recent-projects.js';
 import { validateArtifactManifestInput } from './artifact-manifest.js';
 import { readCurrentAppVersionInfo } from './app-version.js';
 import {
@@ -1097,6 +1098,19 @@ function sendApiError(res, status, code, message, init = {}) {
     .json(createCompatApiErrorResponse(code, message, init));
 }
 
+/**
+ * Return the parent directory of `p`, or `null` when `p` is already the
+ * filesystem root. Used by `/api/fs/ls` so the web folder picker can
+ * disable the "Up" button at the top of the tree without re-implementing
+ * the platform-specific root logic on the client. On Windows the root is
+ * the drive letter (e.g. `C:\`) which `path.dirname` already handles.
+ */
+function parentOf(p) {
+  const parent = path.dirname(p);
+  if (!parent || parent === p) return null;
+  return parent;
+}
+
 const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
 
 export function shouldReportRunCompletedFromMessage(saved, body = {}) {
@@ -1582,21 +1596,6 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 20 * 1024 * 1024 },
-});
-
-const importUpload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (_req, file, cb) => {
-      file.originalname = decodeMultipartFilename(file.originalname);
-      const safe = sanitizeName(file.originalname);
-      cb(
-        null,
-        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`,
-      );
-    },
-  }),
-  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 // Project-scoped multi-file upload. Lands files directly in the project
@@ -2494,182 +2493,139 @@ export async function startServer({
     };
   }
 
-  app.post('/api/projects', async (req, res) => {
+  // ---------------------------------------------------------------------
+  // Project-as-unit endpoints (RFC `project-as-unit.md` §"API surface").
+  //
+  // These replace the pre-RFC trio:
+  //   - POST /api/projects             (UUID-creating, no baseDir)        REMOVED
+  //   - POST /api/import/folder        (open user folder)                 REPLACED → /api/projects/open
+  //   - POST /api/import/claude-design (UUID-keyed ZIP import)            REMOVED
+  //
+  // Project identity is the directory's realpath; opening the same realpath
+  // twice is idempotent (returns the existing project row, refreshes its
+  // recent-projects entry, but never creates a duplicate).
+  // ---------------------------------------------------------------------
+
+  // Recent must be registered BEFORE `/api/projects/:id` below; otherwise
+  // Express matches `recent` as the `:id` path parameter.
+  app.get('/api/projects/recent', async (_req, res) => {
     try {
-      const { id, name, skillId, designSystemId, pendingPrompt, metadata } =
-        req.body || {};
-      if (typeof id !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(id)) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'invalid project id');
-      }
-      if (typeof name !== 'string' || !name.trim()) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'name required');
-      }
-      // baseDir is privileged: it lets a project root directly inside the
-      // user's filesystem. The /api/import/folder endpoint is the only
-      // path that's allowed to set it, because that's where realpath() +
-      // RUNTIME_DATA_DIR reentry checks live. Block client-supplied
-      // metadata.baseDir on this generic create endpoint so an attacker
-      // can't smuggle e.g. /etc through here. Same rule for
-      // originalBaseDir / importedFrom='folder' — only the import path
-      // owns those state fields.
-      if (metadata && typeof metadata === 'object') {
-        if ('baseDir' in metadata) {
-          return sendApiError(
-            res, 400, 'BAD_REQUEST',
-            'baseDir can only be set via POST /api/import/folder',
-          );
-        }
-      }
-      const now = Date.now();
-      const project = insertProject(db, {
-        id,
-        name: name.trim(),
-        skillId: skillId ?? null,
-        designSystemId: designSystemId ?? null,
-        pendingPrompt: pendingPrompt || null,
-        metadata:
-          metadata && typeof metadata === 'object'
-            ? {
-                ...metadata,
-                ...(Array.isArray(metadata.linkedDirs)
-                  ? (() => {
-                      const v = validateLinkedDirs(metadata.linkedDirs);
-                      return v.error ? {} : { linkedDirs: v.dirs };
-                    })()
-                  : {}),
-              }
-            : null,
-        createdAt: now,
-        updatedAt: now,
-      });
-      // Seed a default conversation so the UI always has somewhere to write.
-      const cid = randomId();
-      insertConversation(db, {
-        id: cid,
-        projectId: id,
-        title: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-      // For "from template" projects, seed the chosen template's snapshot
-      // HTML into the new project folder so the agent can Read/edit files
-      // on disk (the system prompt also embeds them, but a real on-disk
-      // copy lets the agent treat them as the project's working state).
-      if (
-        metadata &&
-        typeof metadata === 'object' &&
-        metadata.kind === 'template' &&
-        typeof metadata.templateId === 'string'
-      ) {
-        const tpl = getTemplate(db, metadata.templateId);
-        if (tpl && Array.isArray(tpl.files) && tpl.files.length > 0) {
-          await ensureProject(PROJECTS_DIR, id);
-          for (const f of tpl.files) {
-            if (
-              !f ||
-              typeof f.name !== 'string' ||
-              typeof f.content !== 'string'
-            ) {
-              continue;
-            }
-            try {
-              await writeProjectFile(
-                PROJECTS_DIR,
-                id,
-                f.name,
-                Buffer.from(f.content, 'utf8'),
-              );
-            } catch {
-              // Skip individual file failures — the template snapshot is
-              // best-effort; the agent still has the embedded copy.
-            }
-          }
-        }
-      }
-      /** @type {import('@open-design/contracts').CreateProjectResponse} */
-      const body = { project, conversationId: cid };
+      const body = await listRecentProjects();
       res.json(body);
     } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', String(err));
+      sendApiError(res, 500, 'INTERNAL_ERROR', String(err));
     }
   });
 
-  app.post(
-    '/api/import/claude-design',
-    importUpload.single('file'),
-    async (req, res) => {
-      try {
-        if (!req.file)
-          return res.status(400).json({ error: 'zip file required' });
-        const originalName =
-          req.file.originalname || 'Claude Design export.zip';
-        if (!/\.zip$/i.test(originalName)) {
-          fs.promises.unlink(req.file.path).catch(() => {});
-          return res.status(400).json({ error: 'expected a .zip file' });
-        }
-        const id = randomId();
-        const now = Date.now();
-        const baseName =
-          originalName.replace(/\.zip$/i, '').trim() || 'Claude Design import';
-        const imported = await importClaudeDesignZip(
-          req.file.path,
-          projectDir(PROJECTS_DIR, id),
-        );
-        fs.promises.unlink(req.file.path).catch(() => {});
-
-        const project = insertProject(db, {
-          id,
-          name: baseName,
-          skillId: null,
-          designSystemId: null,
-          pendingPrompt: `Imported from Claude Design ZIP: ${originalName}. Continue editing ${imported.entryFile}.`,
-          metadata: {
-            kind: 'prototype',
-            importedFrom: 'claude-design',
-            entryFile: imported.entryFile,
-            sourceFileName: originalName,
-          },
-          createdAt: now,
-          updatedAt: now,
-        });
-        const cid = randomId();
-        insertConversation(db, {
-          id: cid,
-          projectId: id,
-          title: 'Imported Claude Design project',
-          createdAt: now,
-          updatedAt: now,
-        });
-        setTabs(db, id, [imported.entryFile], imported.entryFile);
-        res.json({
-          project,
-          conversationId: cid,
-          entryFile: imported.entryFile,
-          files: imported.files,
-        });
-      } catch (err) {
-        if (req.file?.path) fs.promises.unlink(req.file.path).catch(() => {});
-        res.status(400).json({ error: String(err) });
+  // -------------------------------------------------------------------------
+  // Filesystem browser — used by the web UI's folder picker dialog when
+  // `window.electronAPI.pickFolder()` is unavailable (browser dev / headless
+  // tests / Linux distros without a native dialog). Lists subdirectories of
+  // `path`, returns the parent and home for breadcrumbs / shortcuts.
+  //
+  // This is intentionally a thin wrapper over `fs.readdir`: any path on the
+  // daemon's host is fair game (matches Cursor / VS Code's "Open Folder"
+  // semantics, which also let you traverse anywhere). The daemon treats
+  // unreadable paths as "no entries" rather than 5xx so the picker can
+  // surface them as "permission denied" without breaking navigation.
+  // -------------------------------------------------------------------------
+  app.get('/api/fs/ls', async (req, res) => {
+    try {
+      const showHidden = String(req.query.showHidden ?? '0') === '1';
+      const requestedRaw = typeof req.query.path === 'string' ? req.query.path.trim() : '';
+      const homeDir = os.homedir();
+      // `~` and `~/...` expansion mirrors the web client's `expandHome` so
+      // users can paste the same path string they typed in the popover.
+      let target: string;
+      if (!requestedRaw) {
+        target = homeDir;
+      } else if (requestedRaw === '~') {
+        target = homeDir;
+      } else if (requestedRaw.startsWith('~/') || requestedRaw.startsWith('~\\')) {
+        target = path.resolve(homeDir, requestedRaw.slice(2));
+      } else if (path.isAbsolute(requestedRaw)) {
+        target = path.resolve(requestedRaw);
+      } else {
+        // Workspace-relative paths get resolved against the daemon CWD,
+        // matching how `POST /api/projects/open` does it.
+        target = path.resolve(process.cwd(), requestedRaw);
       }
-    },
-  );
 
-  // Import an existing local folder as a project. The user picks a folder
-  // and OD works inside it directly: every write goes to metadata.baseDir.
-  // No copy, no shadow tree — the user owns the workspace and is
+      // Resolve symlinks so the breadcrumb reflects the canonical location
+      // — saves the picker from showing two indistinguishable rows for the
+      // same physical directory.
+      let resolved = target;
+      try {
+        resolved = await fs.promises.realpath(target);
+      } catch {
+        // Fall through to readdir which will produce the proper error.
+      }
+
+      let stats: fs.Stats | null = null;
+      try {
+        stats = await fs.promises.stat(resolved);
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code ?? 'ENOENT';
+        return sendApiError(res, 404, 'FS_NOT_FOUND', `path not found: ${resolved} (${code})`);
+      }
+      if (!stats.isDirectory()) {
+        return sendApiError(res, 400, 'FS_NOT_DIR', `not a directory: ${resolved}`);
+      }
+
+      let dirents: fs.Dirent[] = [];
+      try {
+        dirents = await fs.promises.readdir(resolved, { withFileTypes: true });
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException)?.code ?? 'EACCES';
+        // Permission errors are common in real filesystems (`/root`, system
+        // dirs, network mounts that disconnected). Return an empty list with
+        // the error code so the UI can show "permission denied" without
+        // collapsing the picker.
+        return res.json({
+          path: resolved,
+          parent: parentOf(resolved),
+          home: homeDir,
+          entries: [],
+          error: { code, message: String(err) },
+        });
+      }
+
+      const entries = dirents
+        .filter((d) => d.isDirectory() || d.isSymbolicLink())
+        .map((d) => ({ name: d.name, isDir: d.isDirectory() || d.isSymbolicLink() }))
+        .filter((e) => (showHidden ? true : !e.name.startsWith('.')))
+        .sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+
+      res.json({
+        path: resolved,
+        parent: parentOf(resolved),
+        home: homeDir,
+        entries,
+      });
+    } catch (err) {
+      sendApiError(res, 500, 'INTERNAL_ERROR', String(err));
+    }
+  });
+
+  // Open (or re-open) a folder as a project. The user picks a folder on
+  // their disk and OD operates inside it directly: every write goes to
+  // metadata.baseDir. No shadow tree — the user owns the workspace and is
   // responsible for their own version control (git, time machine, etc.),
   // mirroring how Cursor / Claude Code / Aider behave.
-  app.post('/api/import/folder', async (req, res) => {
+  //
+  // Idempotent: if a project row already points at the same realpath, the
+  // existing row is returned and bumped to the top of the recent list.
+  app.post('/api/projects/open', async (req, res) => {
     try {
-      const { baseDir, name, skillId, designSystemId } = req.body || {};
-      if (typeof baseDir !== 'string' || !baseDir.trim()) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'baseDir required');
+      const { path: rawPath, name, skillId, designSystemId } = req.body || {};
+      if (typeof rawPath !== 'string' || !rawPath.trim()) {
+        return sendApiError(res, 400, 'BAD_REQUEST', 'path required');
       }
-      const trimmedInput = baseDir.trim();
+      const trimmedInput = rawPath.trim();
       if (!path.isAbsolute(path.normalize(trimmedInput))) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'baseDir must be absolute');
+        return sendApiError(res, 400, 'BAD_REQUEST', 'path must be absolute');
       }
-      // Resolve symlinks once at import and persist the canonical path.
+      // Resolve symlinks once at open and persist the canonical path.
       // Without this, a user-controlled symlink (e.g. ~/sneaky → /etc) at
       // baseDir would let writeProjectFile escape the project sandbox at
       // every later call: resolveSafe checks the *literal* baseDir, but
@@ -2692,20 +2648,37 @@ export async function startServer({
       if (!dirStat.isDirectory()) {
         return sendApiError(res, 400, 'BAD_REQUEST', 'path must be a directory');
       }
-      // Prevent importing the data directory into itself (post-realpath so
-      // a symlink pointing into RUNTIME_DATA_DIR is also caught). Compare
-      // against the canonical alias because `normalizedPath` is the import
+      // Prevent opening the data directory itself (post-realpath so a
+      // symlink pointing into RUNTIME_DATA_DIR is also caught). Compare
+      // against the canonical alias because `normalizedPath` is the
       // folder's realpath; on macOS the data dir at /var/... resolves to
       // /private/var/... and would never start-with the user-shaped path.
       if (
         normalizedPath === RUNTIME_DATA_DIR_CANONICAL ||
         normalizedPath.startsWith(RUNTIME_DATA_DIR_CANONICAL + path.sep)
       ) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'cannot import the data directory');
+        return sendApiError(res, 400, 'BAD_REQUEST', 'cannot open the data directory');
+      }
+
+      const now = Date.now();
+
+      // Idempotency: search for an existing project row whose
+      // metadata.baseDir matches this realpath. The DB scan is O(n) over
+      // all rows; with the typical project count (≤ ~64), an index isn't
+      // worth the migration. If this list grows, add a `base_dir` column
+      // with a UNIQUE constraint.
+      const existing = listProjects(db).find(
+        (p) => typeof p?.metadata?.baseDir === 'string' && p.metadata.baseDir === normalizedPath,
+      );
+      if (existing) {
+        await addRecentProject(normalizedPath, now).catch(() => {
+          // Best-effort: a failure to record "recent" must not fail the open.
+        });
+        const body = { project: existing };
+        return res.json(body);
       }
 
       const id = randomId();
-      const now = Date.now();
       const projectName =
         typeof name === 'string' && name.trim()
           ? name.trim()
@@ -2732,12 +2705,14 @@ export async function startServer({
       insertConversation(db, {
         id: cid,
         projectId: id,
-        title: `Imported from ${projectName}`,
+        title: `Opened ${projectName}`,
         createdAt: now,
         updatedAt: now,
       });
       if (entryFile) setTabs(db, id, [entryFile], entryFile);
-      /** @type {import('@open-design/contracts').ImportFolderResponse} */
+      await addRecentProject(normalizedPath, now).catch(() => {
+        // See note above.
+      });
       const body = { project, conversationId: cid, entryFile };
       res.json(body);
     } catch (err) {
@@ -4887,13 +4862,24 @@ export async function startServer({
     } else {
       projectId = `routine-${randomUUID()}`;
       projectName = `${routine.name} · ${stamp}`;
+      // Provision a scratch directory so this auto-created project still
+      // satisfies the project-as-unit invariant (1 project ↔ 1 directory).
+      // The folder lives under <runtime data>/projects/scratch/ and is
+      // user-browsable if they want to reuse it later.
+      const routineBaseDir = await createScratchProjectDir(PROJECTS_DIR, `routine-${routine.id}`);
       insertProject(db, {
         id: projectId,
         name: projectName,
         skillId: routine.skillId ?? null,
         designSystemId: appConfig.designSystemId ?? null,
         pendingPrompt: null,
-        metadata: { kind: 'other', intent: 'routine', routineId: routine.id, trigger },
+        metadata: {
+          kind: 'other',
+          intent: 'routine',
+          routineId: routine.id,
+          trigger,
+          baseDir: routineBaseDir,
+        },
         createdAt: now,
         updatedAt: now,
       });
@@ -5567,12 +5553,11 @@ export async function startServer({
     if (run.cancelRequested || design.runs.isTerminal(run.status)) return;
     const runId = run.id;
 
-    // Resolve the project working directory (creating the folder if it
-    // doesn't exist yet). Without one we don't pass cwd to spawn — the
-    // agent then runs in whatever inherited dir, which still lets API
-    // mode work but loses file-tool addressability.
-    // For git-linked projects (metadata.baseDir), use that folder directly
-    // so the agent writes back to the user's original source tree.
+    // Resolve the project working directory. Per RFC project-as-unit,
+    // every project's files live at metadata.baseDir; the agent's cwd is
+    // that folder. Without baseDir we don't pass cwd to spawn — the agent
+    // still runs in whatever inherited dir for API-only flows, but loses
+    // file-tool addressability.
     let cwd = null;
     let existingProjectFiles = [];
     if (typeof projectId === 'string' && projectId) {
@@ -5582,10 +5567,11 @@ export async function startServer({
         if (chatMeta?.baseDir) {
           cwd = path.normalize(chatMeta.baseDir);
           existingProjectFiles = await listFiles(PROJECTS_DIR, projectId, { metadata: chatMeta });
-        } else {
-          cwd = await ensureProject(PROJECTS_DIR, projectId);
-          existingProjectFiles = await listFiles(PROJECTS_DIR, projectId);
         }
+        // Pre-RFC fallback (no baseDir) is gone; the DB startup gate in
+        // db.ts::enforceProjectAsUnitInvariant rejects rows without
+        // baseDir, so this branch is unreachable for any project that
+        // makes it through openDatabase().
       } catch {
         cwd = null;
       }
@@ -6541,13 +6527,17 @@ export async function startServer({
       ? null
       : appConfig.designSystemId ?? null;
 
+    // Provision a scratch directory so this auto-created Orbit project
+    // satisfies the project-as-unit invariant. See the equivalent block in
+    // the Routines run-trigger path above.
+    const orbitBaseDir = await createScratchProjectDir(PROJECTS_DIR, `orbit-${trigger}`);
     insertProject(db, {
       id: projectId,
       name: projectName,
       skillId: 'live-artifact',
       designSystemId: orbitDesignSystemId,
       pendingPrompt: null,
-      metadata: { kind: 'orbit', trigger },
+      metadata: { kind: 'orbit', trigger, baseDir: orbitBaseDir },
       createdAt: now,
       updatedAt: now,
     });
@@ -6583,7 +6573,9 @@ export async function startServer({
     });
 
     if (template?.dir) {
-      const cwd = await ensureProject(PROJECTS_DIR, projectId);
+      const cwd = await ensureProject(PROJECTS_DIR, projectId, {
+        baseDir: orbitBaseDir,
+      });
       const result = await stageActiveSkill(
         cwd,
         path.basename(template.dir),

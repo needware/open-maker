@@ -229,6 +229,8 @@ This format is not ours. We adopt it because awesome-claude-design has already s
 
 ## 5. Mode selection & heuristics
 
+Modes pick **artifact shape** only. The *project context* (sources, DESIGN.md, craft, sibling facets) is implicit — every generation runs inside an open project, so mode selection does not need to surface "where the content comes from"; that is decided once at project level and inherited by all facets. See [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md).
+
 ### Explicit
 User picks a mode from the top-level navigation. Each mode shows only compatible skills.
 
@@ -249,6 +251,14 @@ Inference is a hint; user can override via a mode picker on the artifact page.
 - **Design System → Prototype:** run Design System mode once; every Prototype/Deck/Template run after that picks it up from `./DESIGN.md`.
 - **Template → Prototype:** pick a template, export as starting artifact, re-open in Prototype mode for free-form edits.
 - **Prototype → Design System:** if a generated prototype hits a good aesthetic, we plan a "freeze as design system" action in v1.5. Not in MVP.
+
+### Project as composition unit
+
+Modes do not run in isolation; they run inside a project. A project is a directory on disk that holds `sources/`, `DESIGN.md`, `craft/` (project-local overrides), and `artifacts/` (one subdir per facet — see [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md)). The composition unit is the project, not the artifact:
+
+- **One subject, many facets.** A project's content layer (sources) is the same input for every mode. Generating a Prototype facet and a Deck facet from the same project keeps headlines, product names, and claims aligned — both pulled the same content from `sources/`, both saw the same DESIGN.md, both saw a sibling-facet summary so voice stays consistent.
+- **Soft consistency in v1, hard consistency in v2.** v1 relies on the sibling-facet summary plus shared sources to keep facets aligned. v2 introduces project-level *atoms* (headline / one-liner / audience / offer in `project.json`) so changing one atom marks dependent facets stale. Out of scope for this doc; tracked in the RFC.
+- **Modes pick what changes between facets, not what they share.** Prototype vs. Deck differs in artifact shape and skill workflow. Sources / brand / craft / project intent are constant within a project.
 
 ## 7. Keyboard & UI affordances (cross-mode)
 

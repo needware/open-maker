@@ -67,6 +67,13 @@ od:
     sections: [color, typography]   # which sections it actually uses (for prompt pruning)
   craft:                            # universal, brand-agnostic craft references
     requires: [typography, color, anti-ai-slop]
+  sources:                          # project content the skill consumes (see §5.6)
+    requires: true                  # at least one active source dir must exist
+    dirs: ["docs/"]                 # which source dirs to consume; "*" or omitted = all
+    require_all: false              # when dirs lists multiple, must they all be active
+    scope: ["spec.md", "architecture/"]   # paths inside the source dir
+    strategy: toc                   # mount | toc | both (default: both)
+    ground: true                    # forbid facts not present in active sources
   inputs:                           # typed inputs the user can fill in the UI
     - name: title
       type: string
@@ -107,6 +114,12 @@ od:
 | `od.design_system.requires` | whether to inject `DESIGN.md` |
 | `od.design_system.sections` | pruning the injected DESIGN.md to relevant sections only (token savings) |
 | `od.craft.requires` | which brand-agnostic `craft/<slug>.md` references to inject (e.g. `typography`, `color`, `anti-ai-slop`); injected between DESIGN.md and the skill body |
+| `od.sources.requires` | whether this skill needs at least one active source dir in the project; if `true` and no source is detected, the skill is greyed out in the picker |
+| `od.sources.dirs` | which source dirs (by name) to inject; default `*` means every source the project's resolver detected |
+| `od.sources.require_all` | when `dirs` lists multiple, whether all must be active (default `false`: any one is enough) |
+| `od.sources.scope` | paths within a source dir to keep; everything else is dropped from the ToC index |
+| `od.sources.strategy` | how the daemon makes sources available — `mount` (symlink to cwd), `toc` (header index in prompt), or `both` (default) |
+| `od.sources.ground` | when `true`, the run is grounded: facts not in active sources must be marked unverified or omitted |
 | `od.inputs` | rendering a typed form in the sidebar instead of only free-text |
 | `od.parameters` | rendering live sliders that re-prompt on change |
 | `od.outputs.primary` | which file the iframe loads |
@@ -120,6 +133,7 @@ Defaults:
 - `preview.type`: sniff for `*.html` → html, `*.jsx` → jsx, else "markdown"
 - `preview.entry`: first file matching the sniffed type
 - `design_system.requires`: true if the skill body mentions "design system" or "DESIGN.md"
+- `sources.requires`: false (no source injection — the skill works without project content)
 - `inputs`, `parameters`: none (free-text prompt only)
 
 The goal: **zero-config compatibility** for existing Claude Code skills.
@@ -244,6 +258,35 @@ Resolution at compose time:
 
 The split keeps DESIGN.md authors free of universal-craft duplication and keeps craft authors free of brand-specific drift.
 
+## 5.6 Sources as skill context
+
+A project (see [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md)) is a directory on disk; one or more subdirectories under that directory are *sources* — the project's content layer (markdown about the product, brand assets, references). Skills opt into reading sources via the `od.sources.*` block in [§2](#2-od-extensions-optional); this section is the resolution counterpart to §5 (DESIGN.md) and §5.5 (craft).
+
+Source detection (per project):
+
+1. If the project root has a `KNOWLEDGE.md` whose front-matter lists `sources:`, those paths are authoritative.
+2. Otherwise the daemon scans the project root for the first directory matching, in order: `sources`, `docs`, `content`, `knowledge`, `wiki`. The first hit is the active source dir.
+3. Multiple sources may coexist (multiple subdirectories under `sources/`, or multiple entries in `KNOWLEDGE.md.sources`). Each is indexed independently.
+
+What gets injected:
+
+| Strategy | What the agent sees |
+|---|---|
+| `mount` | Each active source is symlinked into the agent's CWD as `kb/<id>/`. The agent reads files via its own `Read` tool. No prompt cost. |
+| `toc` | Compose time builds a per-source ToC (path + frontmatter + first-level headings) and inserts a labelled section into the system prompt. |
+| `both` (default) | mount + toc; the ToC tells the agent what's available, mount lets it actually read the files. |
+
+Compose-time order is fixed: `[craft] → [DESIGN.md] → [project intent] → [sources index] → [sibling facets summary] → [skill body] → [brief]`. Conflict precedence (highest wins): brief > skill > sources > DESIGN.md > craft.
+
+Token budget: the combined `[sources index] + [sibling facets summary]` block is capped (default ~2k tokens). Over budget ⇒ per-source-dir fair split, then drop body lines in over-budget sources to a path list while keeping `priority`-listed files and first-level headings.
+
+`ground: true` semantics with multiple sources are unioned: if any active source dir or the skill itself sets `ground`, the run is grounded — facts (numbers, product names, dates, claims) not appearing in active sources must be marked unverified or omitted. The UI surfaces a `🔒 grounded` chip; per-run override is allowed unless the skill hard-codes `ground: true`.
+
+Failure modes:
+- `requires: true` with no detected source → skill greyed in the picker; tooltip explains; API run requests return 422 with `{ reason: "no-sources" }`.
+- `dirs: ["docs/"]` listed but `docs/` is not detected and `require_all: true` → same treatment as no source.
+- A source dir mtime change invalidates `<project-root>/.od/cache/sources/<id>/toc.json`; the daemon rebuilds on next compose. Cold rebuild target: < 100 ms for ~200 markdown files.
+
 ## 6. Skill installation
 
 ```sh
@@ -272,14 +315,14 @@ The skill is unchanged. Here's the full path:
    - `preview.type`: sniffed from `assets/template.html` → `html`.
    - `preview.entry`: `index.html` (convention).
    - `design_system.requires`: false (skill body doesn't mention DESIGN.md).
-3. User switches to `deck` mode in the web UI; skill appears in the skill picker.
+3. User opens an existing folder as a project; switches to `deck` mode in the web UI; skill appears in the skill picker.
 4. User types "给我做一份杂志风 8 页投资人 PPT".
 5. Daemon dispatches to active agent (Claude Code) with:
-   - system message: skill's `SKILL.md` body
-   - cwd: `./.od/artifacts/2026-04-24-pitch-deck/`
-   - files already placed in cwd: `template.html` (from skill's `assets/`)
+   - system message: craft + DESIGN.md + sources index + sibling facets summary + skill's `SKILL.md` body
+   - cwd: `<projectRoot>` (e.g. `/Users/me/pitch-deck/`); writes go to `<projectRoot>/artifacts/deck-pitch/`
+   - files already placed in the new facet dir: `template.html` (from skill's `assets/`)
 6. Agent runs its 6-step workflow (clarify → copy template → populate → self-check → preview → refine).
-7. OD streams the agent's tool calls as UI events; artifact dir grows.
+7. OD streams the agent's tool calls as UI events; the facet dir grows.
 8. Agent signals done; daemon sets preview iframe to `index.html`.
 9. User clicks "Export PPTX" — export pipeline notices the skill has no `slides.json` output (the upstream skill doesn't produce one). OD falls back to "print to PDF then page-to-slide PPTX," which is uglier but works. This is a known limitation documented per-skill.
 

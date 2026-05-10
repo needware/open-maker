@@ -14,6 +14,7 @@ export * from './api/mcp';
 export * from './api/orbit';
 export * from './api/providerModels';
 export * from './api/projects';
+export * from './api/project-as-unit';
 export * from './api/proxy';
 export * from './api/routines';
 export * from './api/registry';

@@ -5,14 +5,11 @@
 // These helpers fail soft (returning null / [] on transport errors) so
 // the UI can stay rendered when the daemon is briefly unreachable.
 
-import type { ImportFolderRequest, ImportFolderResponse } from '@open-design/contracts';
-import { randomUUID } from '../utils/uuid';
 import type {
   ChatMessage,
   Conversation,
   OpenTabsState,
   Project,
-  ProjectMetadata,
   ProjectTemplate,
 } from '../types';
 
@@ -38,64 +35,118 @@ export async function getProject(id: string): Promise<Project | null> {
   }
 }
 
-export async function createProject(input: {
-  name: string;
-  skillId: string | null;
-  designSystemId: string | null;
-  pendingPrompt?: string;
-  metadata?: ProjectMetadata;
-}): Promise<{ project: Project; conversationId: string } | null> {
+/**
+ * Open (or re-open) a folder as a project. Per RFC `project-as-unit.md`
+ * (Phase 2, accepted 2026-05-10) this is the only way to start a new
+ * project: the pre-RFC `POST /api/projects` (UUID-creating) and
+ * `POST /api/import/claude-design` (UUID ZIP import) endpoints are gone.
+ *
+ * Idempotent — opening the same realpath twice returns the existing row
+ * (no duplicate). The response carries `conversationId` / `entryFile`
+ * only when a new project row was created; for already-known projects
+ * the daemon returns `{ project }` only, so callers should treat both
+ * as optional.
+ */
+export async function openProject(input: {
+  path: string;
+  name?: string;
+  skillId?: string | null;
+  designSystemId?: string | null;
+}): Promise<
+  | { project: Project; conversationId?: string; entryFile?: string | null }
+  | null
+> {
   try {
-    // `randomUUID` falls back to `crypto.getRandomValues` / `Math.random`
-    // when `crypto.randomUUID` is unavailable. Open Design served over
-    // plain HTTP on a LAN IP (Docker / unRAID self-hosting) is a
-    // non-secure context, where `crypto.randomUUID` is undefined and
-    // calling it directly throws — the surrounding try/catch then turns
-    // the Create button into a silent no-op (issue #849).
-    const id = randomUUID();
-    const resp = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...input }),
-    });
-    if (!resp.ok) return null;
-    return (await resp.json()) as { project: Project; conversationId: string };
-  } catch {
-    return null;
-  }
-}
-
-export async function importFolderProject(
-  input: ImportFolderRequest,
-): Promise<ImportFolderResponse | null> {
-  try {
-    const resp = await fetch('/api/import/folder', {
+    const resp = await fetch('/api/projects/open', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
     if (!resp.ok) return null;
-    return (await resp.json()) as ImportFolderResponse;
+    return (await resp.json()) as {
+      project: Project;
+      conversationId?: string;
+      entryFile?: string | null;
+    };
   } catch {
     return null;
   }
 }
 
-export async function importClaudeDesignZip(
-  file: File,
-): Promise<{ project: Project; conversationId: string; entryFile: string } | null> {
+/**
+ * `GET /api/projects/recent` — flat list of recently-opened folders, most
+ * recent first. Stale entries (paths that no longer exist on disk) are
+ * pruned by the daemon on read, so callers can render this list directly.
+ *
+ * The response also carries `homeDir` so the UI can tildify entries
+ * ("/Users/me/proj" → "~/proj"), mirroring Cursor's project switcher.
+ */
+export interface RecentProjectEntry {
+  path: string;
+  lastOpenedAt?: number;
+}
+
+export interface RecentProjectsResult {
+  entries: RecentProjectEntry[];
+  /** Absolute path of the user's home dir, as the daemon sees it. Empty
+   *  string when the daemon failed to report it. */
+  homeDir: string;
+}
+
+export async function listRecentProjects(): Promise<RecentProjectsResult> {
   try {
-    const form = new FormData();
-    form.append('file', file);
-    const resp = await fetch('/api/import/claude-design', {
-      method: 'POST',
-      body: form,
-    });
+    const resp = await fetch('/api/projects/recent');
+    if (!resp.ok) return { entries: [], homeDir: '' };
+    const json = (await resp.json()) as Partial<RecentProjectsResult>;
+    return {
+      entries: Array.isArray(json.entries) ? json.entries : [],
+      homeDir: typeof json.homeDir === 'string' ? json.homeDir : '',
+    };
+  } catch {
+    return { entries: [], homeDir: '' };
+  }
+}
+
+/**
+ * `GET /api/fs/ls` — list the immediate subdirectories of `path` so the
+ * in-app folder picker can navigate the daemon's host filesystem. Used
+ * as the click-to-pick fallback when `window.electronAPI.pickFolder` is
+ * unavailable (browser dev / headless tests).
+ *
+ * `null` on transport failure so the dialog can render an inline error
+ * row instead of crashing the whole tree. The daemon itself returns
+ * `entries: []` + `error: { code, message }` for permission failures, so
+ * a non-null result with `entries.length === 0` is meaningful too.
+ */
+export interface FsLsEntry {
+  name: string;
+  isDir: boolean;
+}
+
+export interface FsLsResult {
+  path: string;
+  parent: string | null;
+  home: string;
+  entries: FsLsEntry[];
+  error?: { code: string; message: string };
+}
+
+export async function listDir(p?: string, options?: { showHidden?: boolean }): Promise<FsLsResult | null> {
+  try {
+    const params = new URLSearchParams();
+    if (p) params.set('path', p);
+    if (options?.showHidden) params.set('showHidden', '1');
+    const qs = params.toString();
+    const resp = await fetch(`/api/fs/ls${qs ? `?${qs}` : ''}`);
     if (!resp.ok) return null;
-    return (await resp.json()) as {
-      project: Project;
-      conversationId: string;
-      entryFile: string;
+    const json = (await resp.json()) as Partial<FsLsResult>;
+    if (typeof json.path !== 'string') return null;
+    return {
+      path: json.path,
+      parent: typeof json.parent === 'string' ? json.parent : null,
+      home: typeof json.home === 'string' ? json.home : '',
+      entries: Array.isArray(json.entries) ? json.entries : [],
+      error: json.error,
     };
   } catch {
     return null;

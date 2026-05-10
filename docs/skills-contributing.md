@@ -153,7 +153,7 @@ pnpm tools-dev run web
 #      Design system / Image / Video / Audio)
 #    - Find your skill in the picker
 #    - Click it, paste the example_prompt
-#    - Watch the artifact stream into .od/artifacts/<run-id>/
+#    - Watch the facet stream into <projectRoot>/artifacts/<facet-id>/
 #    - Verify preview iframe renders correctly
 #    - Verify export (PPTX / PDF) works if the mode supports it
 ```

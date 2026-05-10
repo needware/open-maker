@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { EntryView } from './components/EntryView';
-import type { CreateInput } from './components/NewProjectPanel';
 import { PetOverlay } from './components/pet/PetOverlay';
 import { migrateCustomPetAtlas } from './components/pet/pets';
 import { ProjectView } from './components/ProjectView';
@@ -35,13 +34,13 @@ import {
 } from './state/config';
 import { applyAppearanceToDocument } from './state/appearance';
 import {
-  createProject,
   deleteProject as deleteProjectApi,
-  importClaudeDesignZip,
-  importFolderProject,
   listProjects,
+  listRecentProjects,
   listTemplates,
+  openProject,
   patchProject,
+  type RecentProjectEntry,
 } from './state/projects';
 import { useI18n } from './i18n';
 import { liveArtifactTabId } from './types';
@@ -126,6 +125,15 @@ export function App() {
   const [skills, setSkills] = useState<SkillSummary[]>([]);
   const [designSystems, setDesignSystems] = useState<DesignSystemSummary[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  // Project-as-unit: list of recently opened folders surfaced on the home
+  // screen. Comes from `GET /api/projects/recent` (~/.open-design/recent-
+  // projects.json). Stays in sync via handleImportFolder which refreshes
+  // it after a successful open.
+  const [recentProjects, setRecentProjects] = useState<RecentProjectEntry[]>([]);
+  // Daemon-reported home directory; used to tildify recent paths in the
+  // homepage list ("/Users/me/proj" → "~/proj"). Empty until the first
+  // successful `/api/projects/recent` round-trip.
+  const [recentHomeDir, setRecentHomeDir] = useState('');
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<
     PromptTemplateSummary[]
@@ -248,6 +256,12 @@ export function App() {
         if (cancelled) return;
         setProjects(list);
         setProjectsLoading(false);
+      });
+
+      void listRecentProjects().then((result) => {
+        if (cancelled) return;
+        setRecentProjects(result.entries);
+        setRecentHomeDir(result.homeDir);
       });
 
       void listTemplates().then((list) => {
@@ -556,59 +570,37 @@ export function App() {
     [config],
   );
 
-  const handleCreateProject = useCallback(
-    async (input: CreateInput & { pendingPrompt?: string }) => {
-      // Honor an explicit `null` design system — the create panel defaults
-      // to "None" for every kind now, and the user expects that to land
-      // as a no-design-system project rather than silently inheriting the
-      // workspace default.
-      const derivedPendingPrompt =
-      input.pendingPrompt ??
-      (input.metadata?.promptTemplate?.prompt?.trim() || undefined);
+  // Per RFC project-as-unit (Phase 2 accepted 2026-05-10): the
+  // pre-RFC `handleCreateProject` (UUID-shadow-tree) and
+  // `handleImportClaudeDesign` (UUID-keyed ZIP import) handlers are
+  // gone. Their daemon endpoints (`POST /api/projects`,
+  // `POST /api/import/claude-design`) returned 404 between slice 2 and
+  // slice 4 of Phase 2 — slice 4 (this change) removes the orphaned web
+  // wiring so neither handler nor the components that used them remain.
+  // Future ZIP / template / skill-prompt entry points reappear as
+  // facets created INSIDE an opened project (slice 3 and §"Open
+  // questions / future work" in the RFC).
 
-      const result = await createProject({
-        name: input.name,
-        skillId: input.skillId,
-        designSystemId: input.designSystemId,
-        pendingPrompt: derivedPendingPrompt,
-        metadata: input.metadata,
-      });
-      if (!result) return;
-      setProjects((curr) => [
-        result.project,
-        ...curr.filter((p) => p.id !== result.project.id),
-      ]);
-      navigate({
-        kind: 'project',
-        projectId: result.project.id,
-        fileName: null,
-      });
-    },
-    [],
-  );
-
-  const handleImportClaudeDesign = useCallback(async (file: File) => {
-    const result = await importClaudeDesignZip(file);
-    if (!result) return;
-    setProjects((curr) => [
-      result.project,
-      ...curr.filter((p) => p.id !== result.project.id),
-    ]);
-    navigate({
-      kind: 'project',
-      projectId: result.project.id,
-      fileName: result.entryFile,
-    });
-  }, []);
-
+  // Per RFC project-as-unit: opening a folder IS creating a project.
+  // Idempotent — re-opening the same realpath returns the existing row,
+  // so this also drives the homepage's "Recent" list (clicking a recent
+  // entry calls openProject which de-dupes server-side).
   const handleImportFolder = useCallback(async (baseDir: string) => {
-    const result = await importFolderProject({ baseDir });
+    const result = await openProject({ path: baseDir });
     if (!result) return;
     setProjects((curr) => [result.project, ...curr.filter((p) => p.id !== result.project.id)]);
+    // Refresh recent list in the background so the homepage list order
+    // updates after a successful open. Failure is non-fatal.
+    void listRecentProjects()
+      .then((next) => {
+        setRecentProjects(next.entries);
+        setRecentHomeDir(next.homeDir);
+      })
+      .catch(() => {});
     navigate({
       kind: 'project',
       projectId: result.project.id,
-      fileName: result.entryFile,
+      fileName: result.entryFile ?? null,
     });
   }, []);
 
@@ -802,7 +794,8 @@ export function App() {
           skills={enabledSkills}
           designSystems={enabledDS}
           projects={projects}
-          templates={templates}
+          recentProjects={recentProjects}
+          recentHomeDir={recentHomeDir}
           promptTemplates={promptTemplates}
           defaultDesignSystemId={config.designSystemId}
           config={config}
@@ -811,8 +804,6 @@ export function App() {
           designSystemsLoading={dsLoading}
           projectsLoading={projectsLoading}
           promptTemplatesLoading={promptTemplatesLoading}
-          onCreateProject={handleCreateProject}
-          onImportClaudeDesign={handleImportClaudeDesign}
           onImportFolder={handleImportFolder}
           onOpenProject={handleOpenProject}
           onOpenLiveArtifact={handleOpenLiveArtifact}

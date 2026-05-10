@@ -12,13 +12,14 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
 
 **Deliverables:**
 - [x] `README.md` + `docs/spec.md` + architecture / protocol / adapter / modes / references docs (this repo, as of now)
-- [ ] `docs/schemas/skill-manifest.json` — JSON Schema for the `od:` front-matter block
+- [x] `docs/rfc-drafts/project-as-unit.md` — accepted; project ≡ a directory on disk; UUID-keyed `.od/projects/<uuid>/` model retired
+- [ ] `docs/schemas/skill-manifest.json` — JSON Schema for the `od:` front-matter block (must include `od.sources.*`)
 - [ ] `docs/schemas/design-system.md` — formal spec of the 9-section `DESIGN.md`
-- [ ] `docs/schemas/protocol.md` — HTTP/SSE API schemas
+- [ ] `docs/schemas/protocol.md` — HTTP/SSE API schemas (project-scoped: `/api/projects/open`, `/api/projects/:project/facets`, …)
 - [ ] `docs/schemas/adapter.md` — adapter interface in TypeScript, printed out
 - [ ] `docs/examples/DESIGN.sample.md` — a working example design system
 - [ ] `docs/examples/saas-landing-skill/` — a working example skill (the one sketched in `skills-protocol.md` §8)
-- [ ] Resolve the four "open questions" at the end of each spec doc
+- [ ] Resolve the four "open questions" at the end of each spec doc + the seven open questions in `project-as-unit.md`
 
 **Exit criteria:** every interface we'll implement has a signed-off schema in this repo. No code yet.
 
@@ -26,21 +27,23 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
 
 ## Phase 1 — MVP (~6–8 weeks)
 
-**Goal:** a single developer can clone, install, start the daemon, point at Claude Code, and produce a prototype and a deck from scratch. The tool is usable for real work even if not polished.
+**Goal:** a single developer can clone, install, start the daemon, open a folder as a project, point at Claude Code, and produce a prototype and a deck from scratch. The tool is usable for real work even if not polished.
 
 ### Scope
 
 **Included:**
 - Web app (Next.js 16, App Router)
-  - chat pane · artifact tree · sandboxed iframe preview · export menu
-  - skill picker · mode picker · design-system picker
+  - project chooser · sources panel · facet grid · sandboxed iframe preview · export menu
+  - chat pane (project-scoped) · skill picker · mode picker · design-system picker
   - **no** comment mode yet · **no** sliders yet · **no** template gallery UI yet
 - Local daemon (Node)
   - HTTP/SSE API on `:7456`
   - agent detection + cached results
   - skill registry (scan three dirs, hot-reload)
-  - artifact store (plain files + `history.jsonl`)
-  - design-system resolver
+  - **project model: project ≡ a folder on disk** (no UUID-keyed shadow tree); registry keyed by `realpath`, persisted as `~/.open-design/recent-projects.json`
+  - facet store at `<project-root>/artifacts/<facet-id>/` (plain files + per-facet and per-project `history.jsonl`)
+  - source resolver + ToC indexer (caches under `<project-root>/.od/cache/sources/<id>/toc.json`); default-detects `["sources","docs","content","knowledge","wiki"]` and respects `KNOWLEDGE.md.sources`
+  - design-system resolver, project-local `craft/` overrides
   - export pipeline (HTML + ZIP only; PDF/PPTX in Phase 2)
 - Agent adapters
   - **`claude-code`** — native skill loading, streaming, surgical edit
@@ -48,7 +51,7 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
 - Skills shipped in repo
   - `saas-landing` (Prototype)
   - `magazine-web-ppt` (Deck, fork of guizang-ppt-skill)
-- Modes available
+- Modes available (each runs as a facet inside a project)
   - **Prototype** (fully working)
   - **Deck** (fully working)
   - **Design System** (basic: from text brief only; no screenshot input yet)
@@ -73,23 +76,25 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
 | Week | Theme | Concrete deliverables |
 |---|---|---|
 | 1 | Scaffolding | pnpm workspaces (`apps/web`, `apps/daemon`, `e2e`); Next.js 16 base; daemon CLI skeleton; CI green |
-| 2 | Daemon core | HTTP/SSE API; project/conversation store; skill registry scanning; artifact store; design-system resolver loading `DESIGN.md` |
-| 3 | Claude Code adapter | detection (PATH + `~/.claude/` probe); spawn with `--output-format stream-json`; parser from JSON-lines → `AgentEvent`; streaming to daemon's session; cancel via SIGTERM |
-| 4 | API-fallback adapter | Anthropic Messages streaming; minimal tool loop (Read/Write/Edit rooted to artifact cwd); integration with skill prompt injection |
-| 5 | Web UI — chat + file workspace | React state + daemon-backed project store; SSE client; chat pane; file workspace reflects project files; skill picker |
-| 6 | Web UI — preview + export | sandboxed iframe with hot reload; JSX → vendored React/Babel runtime; export ZIP; export self-contained HTML (inline CSS) |
+| 2 | Daemon core | HTTP/SSE API; **project registry keyed by `realpath`** (no UUID model in the codebase); `recent-projects.json`; skill registry scanning; facet store at `<project-root>/artifacts/`; design-system resolver loading `DESIGN.md`; source resolver + ToC indexer with default detection list |
+| 3 | Claude Code adapter | detection (PATH + `~/.claude/` probe); spawn with `--output-format stream-json` and `cwd = project root`; parser from JSON-lines → `AgentEvent`; streaming to daemon's session; cancel via SIGTERM |
+| 4 | API-fallback adapter | Anthropic Messages streaming; minimal tool loop (Read/Write/Edit rooted to project root with facet-scoped writes); integration with skill prompt injection (craft + DESIGN.md + sources index + sibling facets summary) |
+| 5 | Web UI — projects + chat | project chooser screen (open folder / create folder); project view with sources panel + facet grid; SSE client; project-scoped chat pane; skill picker greys skills whose `od.sources.requires` is unmet |
+| 6 | Web UI — preview + export | sandboxed iframe with hot reload; JSX → vendored React/Babel runtime; export ZIP; export self-contained HTML (inline CSS); facet add / regen / delete UI |
 | 7 | Default skills | port `guizang-ppt-skill` (no modifications; add `od:` extension block); write `saas-landing` skill; write 1–2 DESIGN.md examples; docs for skill authors |
-| 8 | Polish + dogfood | end-to-end dogfooding; performance pass (daemon <500ms cold start, first generation overhead <50ms); bug-fixing; first publishable alpha |
+| 8 | Polish + dogfood | end-to-end dogfooding (open this repo as a project, generate prototype + deck from `docs/`); performance pass (daemon <500ms cold start, first generation overhead <50ms, source ToC cold rebuild <100ms for ~200 files); bug-fixing; first publishable alpha |
 
 ### MVP exit criteria
 
 1. `corepack enable && pnpm install && pnpm tools-dev run web` works on clean macOS and Linux with Node 24.
-2. With Claude Code installed: prototype + deck generation works end-to-end.
+2. With Claude Code installed: open a folder → prototype + deck facet generation works end-to-end.
 3. Without Claude Code installed: API-fallback produces prototypes (not decks — guizang-ppt-skill needs native skill loading).
-4. A user can drop a DESIGN.md into the project root and subsequent generations respect it.
-5. A third party can publish a skill repo; `od skill add <url>` installs it and it works.
-6. Artifacts are plain files; `git add ./.od/artifacts/` and `git log` tell a sensible story.
-7. No Electron, no Tauri, no desktop packaging anywhere in the repo.
+4. A user can drop a DESIGN.md into a project root and subsequent facet generations respect it.
+5. A user opening a folder that contains `docs/` (or any default-detected source name) sees it auto-attached as the project's source; `od.sources.requires` skills become available; grounded runs honor `ground: true`.
+6. A third party can publish a skill repo; `od skill add <url>` installs it and it works.
+7. Facets are plain files inside the project root; `git add artifacts/` and `git log` tell a sensible story without leaving the user's directory.
+8. No `.od/projects/<uuid>/` write paths anywhere in the codebase; the project model is folder-only.
+9. No Electron, no Tauri, no desktop packaging anywhere in the repo.
 
 ---
 
@@ -188,6 +193,7 @@ Record one line per material decision as we go. Example entries:
 - 2026-04-24 — Adopt `DESIGN.md` (awesome-claude-design) verbatim rather than inventing a new format. *Why:* 68 existing files are immediately compatible.
 - 2026-04-24 — Do not ship an Electron / Tauri wrapper. *Why:* every minute on code-signing is a minute not on skills; `cc-switch` already solves the tray-icon use case.
 - 2026-04-24 — Delegate the entire agent loop to the user's CLI. *Why:* reimplementing is worse than integrating; ecosystem compatibility beats control.
+- 2026-05-10 — Project ≡ a directory on disk; the unit of creation is the project, not the artifact. UUID-keyed `.od/projects/<uuid>/` model and `POST /api/import/folder` are removed outright (no coexistence period). *Why:* one project shape eliminates the "which kind of project?" branch in every feature decision; user-owned folders are git-reviewable, Finder-browsable, and aligned with how Cursor / Claude Code / Aider behave. See `rfc-drafts/project-as-unit.md`.
 
 Decisions supersede each other; keep the log append-only and date every entry.
 

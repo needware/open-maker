@@ -36,9 +36,58 @@ export function openDatabase(projectRoot: string, { dataDir }: { dataDir?: strin
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   migrate(db);
+  enforceProjectAsUnitInvariant(db, file);
   dbInstance = db;
   dbFile = file;
   return db;
+}
+
+/**
+ * Project-as-unit invariant (RFC `project-as-unit.md` §"Core definition"):
+ * every project row must be backed by a real on-disk directory pointed at by
+ * `metadata.baseDir`. The pre-RFC daemon allowed UUID-keyed projects with no
+ * baseDir whose files lived under `.od/projects/<uuid>/` — that model is
+ * gone.
+ *
+ * The RFC's Phase 2 says "single landing, no coexistence; no migration
+ * tooling". So if we find any legacy row, we refuse to start with a clear
+ * message rather than silently masking the breakage. Operators with legacy
+ * data should drop `.od/app.sqlite` and reopen their projects as folders.
+ */
+function enforceProjectAsUnitInvariant(db: SqliteDb, file: string): void {
+  const stmt = db.prepare<unknown[], { id: string; metadata_json: string | null }>(
+    'SELECT id, metadata_json FROM projects',
+  );
+  const offenders: string[] = [];
+  for (const row of stmt.all()) {
+    let baseDir: unknown = null;
+    if (typeof row.metadata_json === 'string' && row.metadata_json) {
+      try {
+        const parsed = JSON.parse(row.metadata_json) as Record<string, unknown>;
+        baseDir = parsed?.baseDir;
+      } catch {
+        // unparseable metadata counts as missing baseDir
+      }
+    }
+    if (typeof baseDir !== 'string' || !baseDir) {
+      offenders.push(row.id);
+    }
+  }
+  if (offenders.length === 0) return;
+  const sample = offenders.slice(0, 5).join(', ');
+  const more = offenders.length > 5 ? ` … (+${offenders.length - 5} more)` : '';
+  throw new Error(
+    [
+      'Open Design refuses to start: legacy projects without metadata.baseDir found in ' + file + '.',
+      'After RFC project-as-unit, every project must be a directory on disk. Legacy UUID-keyed projects',
+      'are no longer supported. Affected project ids: ' + sample + more,
+      '',
+      'To recover: stop the daemon, delete the SQLite database (e.g. `rm ' + file + '*` to clear WAL/SHM),',
+      'then reopen each project as a folder via the new Open Folder UI. Your generated artifacts under',
+      '.od/projects/<uuid>/ are not migrated automatically; copy anything you want to keep into a real',
+      'user-owned folder before deleting.',
+    ].join('\n'),
+  );
 }
 
 export function closeDatabase() {

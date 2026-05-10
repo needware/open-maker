@@ -1,13 +1,26 @@
 // @ts-nocheck
-// Project files registry. Each project is a folder under
-// <projectRoot>/.od/projects/<projectId>/. The frontend's project list
-// (localStorage) carries metadata; this module is the single owner of the
-// on-disk content (HTML artifacts, sketches, uploaded images, pasted text).
+// Project files registry.
+//
+// Per RFC `project-as-unit.md` (Phase 2, accepted 2026-05-10), every project
+// IS a directory on disk: `metadata.baseDir` is the project's identity. This
+// module no longer owns a UUID-keyed shadow tree under
+// `<runtimeDataDir>/projects/<projectId>/`; all reads and writes go through
+// `metadata.baseDir`.
+//
+// `projectsRoot` is still threaded through the API for two reasons:
+// 1. Auto-trigger flows (Routines, Orbit, ZIP import) provision a scratch
+//    directory under `projectsRoot` and use that as `baseDir` — that scratch
+//    directory IS a real folder on disk, so it satisfies the project=folder
+//    invariant. See `createScratchProjectDir()` below.
+// 2. Legacy callers that haven't been threaded `metadata` yet still pass it.
+//    Those are detected and refused via the runtime guard in
+//    `resolveProjectDir()` rather than silently falling back.
 //
 // All paths flowing in from HTTP handlers are validated against the project
 // directory to prevent path traversal — see resolveSafe().
 
 import { link, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import JSZip from 'jszip';
 import {
@@ -22,26 +35,74 @@ export const projectFileRenameTestHooks = {
   beforeCommit: null as null | ((paths: { source: string; target: string }) => Promise<void> | void),
 };
 
+// Subdirectory under `projectsRoot` for daemon-provisioned scratch projects
+// (Routines, Orbit, ZIP imports). Scratch projects are real on-disk
+// directories — they're just owned by the daemon rather than the user.
+const SCRATCH_DIR_NAME = 'scratch';
+
 export function projectDir(projectsRoot, projectId) {
   if (!isSafeId(projectId)) throw new Error('invalid project id');
   return path.join(projectsRoot, projectId);
 }
 
-// Returns the folder a project's files live in. For git-linked projects
-// (metadata.baseDir set), this is the user's own folder. Otherwise falls
-// back to the standard computed path under projectsRoot.
+/**
+ * Provision a scratch directory under `<projectsRoot>/scratch/<prefix>-<uuid>/`
+ * for daemon-auto-created projects (Routines, Orbit, ZIP imports). The
+ * returned path is the new baseDir to store on the project row.
+ *
+ * The scratch directory is created with `recursive: true` and returned as
+ * an absolute path. Caller is responsible for persisting it as
+ * `metadata.baseDir` on the project row.
+ */
+export async function createScratchProjectDir(projectsRoot, prefix = 'scratch') {
+  if (typeof projectsRoot !== 'string' || !path.isAbsolute(projectsRoot)) {
+    throw new Error('createScratchProjectDir: projectsRoot must be absolute');
+  }
+  const safePrefix = String(prefix).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 32) || 'scratch';
+  const dir = path.join(projectsRoot, SCRATCH_DIR_NAME, `${safePrefix}-${randomUUID()}`);
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Returns the folder a project's files live in. Per RFC project-as-unit, this
+ * is always `metadata.baseDir` (set at project open / scratch provisioning).
+ *
+ * If `metadata.baseDir` is missing, this falls back to the legacy
+ * `<projectsRoot>/<projectId>/` path AND logs a one-shot deprecation warning.
+ * The DB startup gate in `db.ts::enforceProjectAsUnitInvariant` rejects any
+ * persisted project row without baseDir, so this fallback is reachable only
+ * from internal subsystems (live-artifacts, project-watchers, transcripts)
+ * that haven't been threaded `metadata` through yet — those will be cleaned
+ * up in slice 2.5; until then, the fallback keeps them functional.
+ */
 export function resolveProjectDir(projectsRoot, projectId, metadata?) {
   if (typeof metadata?.baseDir === 'string') {
     const p = path.normalize(metadata.baseDir);
     if (path.isAbsolute(p)) return p;
+    throw new Error(`resolveProjectDir: metadata.baseDir for project ${projectId} is not absolute (${metadata.baseDir})`);
   }
+  warnLegacyProjectDirFallback(projectId);
   if (!isSafeId(projectId)) throw new Error('invalid project id');
   return path.join(projectsRoot, projectId);
 }
 
+const _warnedLegacyProjectIds = new Set<string>();
+function warnLegacyProjectDirFallback(projectId: string): void {
+  if (_warnedLegacyProjectIds.has(projectId)) return;
+  _warnedLegacyProjectIds.add(projectId);
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[od] resolveProjectDir: project ${projectId} accessed without metadata.baseDir; ` +
+    'falling back to legacy projectsRoot path. This warning will become an error in a follow-up cleanup slice.',
+  );
+}
+
 export async function ensureProject(projectsRoot, projectId, metadata?) {
   const dir = resolveProjectDir(projectsRoot, projectId, metadata);
-  // Git-linked folders already exist; skip mkdir to avoid side-effects.
+  // For the legacy fallback (no baseDir), recreate the directory. Real
+  // projects' baseDir is always an existing folder, so this is a no-op for
+  // the post-RFC normal path.
   if (typeof metadata?.baseDir !== 'string') {
     await mkdir(dir, { recursive: true });
   }

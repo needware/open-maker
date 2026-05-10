@@ -46,19 +46,24 @@ The differentiation is not "yet another design generator." It is **an integratio
 
 ## 4. User scenarios
 
+Every scenario starts the same way: **the user opens a folder.** That folder is the project (see [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md)); each generation produces a new *facet* under `<project-root>/artifacts/<facet-id>/`. Sources, `DESIGN.md`, and craft come from the project root and are inherited by every facet — no per-run "attach a knowledge base" step.
+
 ### S1 — "Give me a prototype"
-User opens the web app, types *"Airbnb-style search page, use our internal design system"*, OD picks the `prototype-skill`, resolves the user's `DESIGN.md`, dispatches to Claude Code with both files plus the brief, streams tool calls into the UI, and renders the resulting HTML in an iframe preview. User clicks an element, drops a comment, the agent rewrites just that region.
+User opens an existing folder (or creates one). Types *"Airbnb-style search page, use our internal design system"*. OD picks `prototype-skill`, resolves the project's `DESIGN.md` and any active sources, dispatches to Claude Code with the brief, streams tool calls into the UI, writes to `artifacts/prototype-search/`, and renders the resulting HTML in an iframe preview. User clicks an element, drops a comment, the agent rewrites just that region.
 
 ### S2 — "Make me a deck"
-User says *"8-slide magazine-style pitch deck for my seed round"*. OD routes to `deck-skill` (a fork of [`guizang-ppt-skill`][guizang]). Output is a single-file HTML deck; preview is the deck itself with arrow-key navigation; export is PDF/PPTX.
+Same project; user says *"8-slide magazine-style pitch deck for my seed round"*. OD routes to `deck-skill` (a fork of [`guizang-ppt-skill`][guizang]). Compose includes a sibling-facet summary of the existing prototype so the deck stays consistent in headline / voice. Output is a single-file HTML deck under `artifacts/deck-pitch/`; preview is the deck itself with arrow-key navigation; export is PDF/PPTX.
 
 ### S3 — "Start from a template"
-User picks "SaaS landing — Stripe-ish" from a gallery. Template is a pre-filled artifact bundle plus a `DESIGN.md` reference. Agent only fills content; structure is already there. This is the fastest mode — useful for users who don't want to prompt at all.
+User picks "SaaS landing — Stripe-ish" from the gallery. Template is a pre-filled artifact bundle plus a `DESIGN.md` reference; OD copies it into `artifacts/template-saas/` and the agent only fills content. Structure is already there. Fastest path; useful for users who don't want to prompt at all.
 
 ### S4 — "Set up our design system"
-User uploads a screenshot, brand guide PDF, or Figma link. OD runs `design-system-skill` which produces a `DESIGN.md` following the 9-section format. That file is then referenced by every subsequent generation — prototypes, decks, templates all pick up the tokens.
+User uploads a screenshot, brand guide PDF, or Figma link. OD runs `design-system-skill` which produces a `DESIGN.md` at the project root following the 9-section format. From this point on every subsequent facet (prototype, deck, template) in the project picks up the tokens automatically.
 
-These four scenarios map 1:1 to the four modes in [`modes.md`](modes.md).
+### S5 — "Generate from my docs"
+User opens a folder that already contains a `docs/` subdirectory (or any of `sources/`, `content/`, `knowledge/`, `wiki/`). OD detects it as the project's source automatically and surfaces a `📚 docs-driven` chip in the run header. Subsequent prototype / deck / template generations read the source ToC plus targeted files via the agent's `Read` tool, keep facts and product names anchored to the docs, and (when the active skill or any source declares `ground: true`) refuse to invent claims not present in sources. The open-design repository itself is a working example: open this repo as a project, and `docs/` is the source out of the box.
+
+Scenarios S1–S4 map onto the four modes in [`modes.md`](modes.md). S5 is not a fifth mode — it's any of the four modes running inside a project that has sources.
 
 ## 5. High-level modules
 

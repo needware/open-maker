@@ -150,29 +150,48 @@ Conflicts resolve by priority (higher wins). Each skill parsed once; watched for
 - Injects as a prepended system message on every agent run, plus as a `{{ design_system }}` template variable skills can reference.
 - Hot-reloads on file change in dev.
 
-### 3.6 Artifact store
+### 3.6 Project layout & artifact store
 
-Plain files on disk. Conventional layout per project:
+A project is a directory on the user's disk (see [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md)). The directory is the project — no UUID-keyed shadow tree, no `.od/projects/<uuid>/` write paths. Layout, with everything outside the project root itself optional:
 
 ```
-./.od/
-├── config.json                  # project-level daemon config
-├── artifacts/
-│   ├── 2026-04-24T10-03-12-landing/
-│   │   ├── artifact.json        # metadata (skill, mode, prompt, parent)
+<project-root>/                  ← the project IS this directory
+├── project.json                 # optional manifest (name, intent, source overrides)
+├── DESIGN.md                    # optional brand, picked up automatically
+├── KNOWLEDGE.md                 # optional project-intent doc + explicit sources index
+├── sources/                     # optional content layer; default-detected if absent
+│   ├── docs/
+│   ├── brand/
+│   └── refs/
+├── craft/                       # optional project-local craft overrides; merges with repo craft
+├── artifacts/                   # facets (one subdir per facet)
+│   ├── prototype-landing/
+│   │   ├── facet.json           # mode/skill/lastBrief/sourcesUsed/parameters
 │   │   ├── index.html           # primary output (or .jsx, .md, .pptx.json)
-│   │   └── assets/              # skill-generated images, fonts, etc.
-│   └── …
-├── history.jsonl                # append-only action log (generations, edits, comments)
-└── sessions/
-    └── <session-id>.json        # transient; garbage-collected after 24h
+│   │   ├── assets/              # skill-generated images, fonts, etc.
+│   │   └── history.jsonl        # facet-level surgical history
+│   ├── deck-investor/
+│   └── image-social-card/
+└── .od/                         # daemon-local, gitignored
+    ├── config.json              # project-level daemon config
+    ├── lock                     # mutex when an OD instance has the project open
+    ├── sessions/
+    │   └── <session-id>.json    # transient; garbage-collected after 24h
+    ├── cache/
+    │   └── sources/<id>/toc.json   # mtime-invalidated source ToC index
+    └── history.jsonl            # project-level (cross-facet) timeline
 ```
+
+Default source detection: if no `KNOWLEDGE.md.sources` is set, the daemon scans the project root for the first directory matching `["sources", "docs", "content", "knowledge", "wiki"]` and treats that as the active source. Multiple sources may coexist (subdirs under `sources/`, or multiple entries in `KNOWLEDGE.md.sources`).
 
 Rationale:
-- **Plain files** → users can `git add ./.od/artifacts/` and review designs in PRs.
-- **`artifact.json` metadata** → OD can reconstruct the artifact tree without a DB.
-- **`history.jsonl` not SQLite** → append-only, git-friendly, greppable. [Open CoDesign][ocod] uses SQLite; we deliberately don't.
-- **Sessions separate from artifacts** → sessions are ephemeral UI state; artifacts are durable.
+- **Plain files at the project root** → users can `git add artifacts/` and review designs in PRs alongside the rest of their project. The directory is user-owned; OD does not hide files or block rename/move.
+- **`facet.json` metadata** → OD can reconstruct each facet (its mode, skill, parameters, parent prompt) without a DB.
+- **`history.jsonl` not SQLite** → append-only, git-friendly, greppable. [Open CoDesign][ocod] uses SQLite; we deliberately don't. Project-level (cross-facet timeline) lives in `.od/history.jsonl`; per-facet (surgical) history lives next to each facet.
+- **Sessions separate from artifacts** → sessions are ephemeral UI state in `.od/sessions/`; artifacts are durable user content in `artifacts/`.
+- **Source ToC cached, not authoritative** → cache lives in `.od/cache/sources/<id>/toc.json`; sources on disk are the single source of truth, mtime invalidates the cache.
+
+The daemon's only cross-project state is `~/.open-design/recent-projects.json` (a list of opened-folder paths and timestamps; not a context source — see invariant #4 in the RFC). Project records elsewhere (DB rows, UUID dirs, virtual workspaces) are not maintained.
 
 ### 3.7 Export pipeline
 
@@ -187,19 +206,21 @@ Rationale:
 ## 4. Data flow — a typical "generate prototype" turn
 
 ```
-1. User types prompt in web chat.
+1. User types prompt in web chat (inside an open project).
 2. Web sends { method: "session.generate", params: {
-        sessionId, prompt, modeHint: "prototype"
+        sessionId, projectPath, prompt, modeHint: "prototype"
    }} to daemon via WS.
 
 3. Daemon:
      a. picks active skill (prototype-skill)
-     b. loads design-system (DESIGN.md)
-     c. materializes a new artifact dir under ./.od/artifacts/<slug>/
+     b. loads design-system (DESIGN.md), craft, sources ToC, sibling-facet summary
+     c. materializes a new facet dir at <projectRoot>/artifacts/<facet-id>/
      d. invokes agent adapter with:
-          - system: skill's SKILL.md contents + DESIGN.md
+          - system: craft + DESIGN.md + project intent + sources index +
+                    sibling facets summary + skill SKILL.md
           - user: original prompt
-          - cwd: the new artifact dir
+          - cwd: <projectRoot>  (agent reads sources via its own Read tool;
+                                 writes are scoped to the new facet dir)
      e. streams agent events back to web as they arrive:
           - "tool_call" (edit file, write file, read file)
           - "text_delta"
@@ -207,16 +228,18 @@ Rationale:
 
 4. Web shows:
      - running tool-call feed in the side panel
-     - artifact tree updates as files materialize
+     - facet tree updates as files materialize
      - preview iframe loads the primary output file when agent signals "done"
      - slider/comment overlay activates once preview loads
 
 5. On completion, daemon appends:
-     { ts, sessionId, artifactId, action: "generate", skill, promptHash }
-   to history.jsonl.
+     { ts, sessionId, projectPath, facetId, action: "generate",
+       skill, promptHash }
+   to <projectRoot>/.od/history.jsonl (and a per-facet history.jsonl
+   inside the facet dir).
 
 6. User comments on an element → web sends { method: "session.refine", params: {
-        sessionId, artifactId, elementId, note }}
+        sessionId, projectPath, facetId, elementId, note }}
 
 7. Daemon re-invokes agent with surgical-edit instruction + the note.
    Adapter translates based on capabilities:
@@ -257,44 +280,54 @@ The shipped daemon uses HTTP routes plus Server-Sent Events for streaming chat o
 Representative API surface:
 
 ```
-GET  /api/health
-GET  /api/agents
-GET  /api/skills
-GET  /api/design-systems
-GET  /api/projects
-POST /api/projects
-POST /api/import/folder                    # see Folder import
-GET  /api/projects/:id/files
-POST /api/projects/:id/upload
-POST /api/chat              -> text/event-stream
-POST /api/artifacts/save
+GET    /api/health
+GET    /api/agents
+GET    /api/skills
+GET    /api/design-systems
+
+POST   /api/projects/open                                    # open a folder; idempotent
+GET    /api/projects/recent                                  # list recently opened paths
+GET    /api/projects/:project/files                          # :project = url-encoded realpath
+POST   /api/projects/:project/upload
+GET    /api/projects/:project/sources                        # detected source dirs + ToC summary
+POST   /api/projects/:project/facets                         # create a new facet
+POST   /api/projects/:project/facets/:facet/regen            # re-run an existing facet
+DELETE /api/projects/:project/facets/:facet                  # soft-delete to .od/trash/
+
+POST   /api/chat                                             # text/event-stream; requires :project context
+POST   /api/artifacts/save                                   # writes inside the active facet
 ```
 
-### Folder import
+### Project open & resolution
 
-`POST /api/import/folder` creates a project rooted at an existing local
-folder instead of the default `.od/projects/<id>/`. The submitted
-`baseDir` is stored on `metadata.baseDir` and OD reads / writes directly
-inside it — there is no copy or shadow tree. The user owns the workspace
-and is responsible for their own version control (git, time machine,
-etc.), mirroring how Cursor / Claude Code / Aider behave.
+`POST /api/projects/open` takes `{ path: string }`. The daemon canonicalizes
+via `realpath()`, refuses paths inside `RUNTIME_DATA_DIR`, adds the entry to
+`~/.open-design/recent-projects.json`, and returns a `ProjectRef`. Opening
+the same realpath twice is a no-op.
 
-Safety:
+There is no separate `POST /api/import/folder`. There is no UUID-keyed
+"create draft project" endpoint — a project is always a folder on disk.
+"I don't have a folder yet" is handled by the UI / CLI (`od init` or a
+`Create folder…` action) materializing a real directory before any open
+call is issued.
 
-- The submitted `baseDir` is canonicalized via `realpath()` before
-  storage, so user-controlled symlinks cannot redirect later writes.
+Safety on every project-scoped write:
+
+- `:project` is decoded to a path and re-canonicalized; mismatch with the
+  recorded realpath aborts the request.
 - Standard `resolveSafe` / `sanitizePath` checks apply on every write —
-  `metadata.baseDir` only changes the project root, not the bounds check.
-- Imports inside `RUNTIME_DATA_DIR` (the daemon's own data directory) are
+  outputs must remain inside the project root.
+- Writes inside `RUNTIME_DATA_DIR` (the daemon's own data directory) are
   refused after symlink resolution.
-- The file panel hides the conventional build / install dirs
+- The file panel hides conventional build / install dirs
   (`node_modules .git dist build .next .nuxt .turbo .cache .output out
   coverage __pycache__ .venv vendor target .od .tmp`) so the listing
   stays focused on design content.
 
-Request / response types: `ImportFolderRequest`, `ImportFolderResponse`
+Request / response types: `ProjectRef`, `OpenProjectRequest`,
+`OpenProjectResponse`, `FacetRef`, `FacetManifest`,
+`CreateFacetRequest`, `CreateFacetResponse`, `SourceDirRef`, `SourceToc`
 in `@open-design/contracts`.
-
 
 Shared API contract types live in [`packages/contracts/src`](../packages/contracts/src).
 

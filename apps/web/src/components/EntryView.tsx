@@ -1,35 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ConnectorDetail, ConnectorStatusResponse } from '@open-design/contracts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ConnectorDetail } from '@open-design/contracts';
 import { useT } from '../i18n';
-import {
-  DEFAULT_AUDIO_MODEL,
-  DEFAULT_IMAGE_MODEL,
-  DEFAULT_VIDEO_MODEL,
-} from '../media/models';
 import type {
   AgentInfo,
   AppConfig,
   DesignSystemSummary,
   Project,
-  ProjectKind,
-  ProjectMetadata,
-  ProjectTemplate,
   PromptTemplateSummary,
   SkillSummary,
 } from '../types';
+import type { RecentProjectEntry } from '../state/projects';
 import { DesignsTab } from './DesignsTab';
 import { DesignSystemPreviewModal } from './DesignSystemPreviewModal';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { ExamplesTab } from './ExamplesTab';
 import { AppChromeHeader } from './AppChromeHeader';
+import { FolderPickerDialog } from './FolderPickerDialog';
 import { Icon } from './Icon';
 import { LanguageMenu } from './LanguageMenu';
 import { CenteredLoader } from './Loading';
-import { NewProjectPanel, type CreateInput } from './NewProjectPanel';
-import {
-  fetchConnectors,
-  fetchConnectorStatuses,
-} from '../providers/registry';
 import { PetRail } from './pet/PetRail';
 import { PromptTemplatePreviewModal } from './PromptTemplatePreviewModal';
 import { PromptTemplatesTab } from './PromptTemplatesTab';
@@ -41,23 +30,36 @@ interface Props {
   skills: SkillSummary[];
   designSystems: DesignSystemSummary[];
   projects: Project[];
-  templates: ProjectTemplate[];
+  /**
+   * Recent folders surfaced as the homepage's primary entry point per RFC
+   * `project-as-unit.md`. Most recent first; entries with stale paths are
+   * already filtered server-side.
+   */
+  recentProjects: RecentProjectEntry[];
+  /**
+   * Daemon-reported `os.homedir()`, used to tildify recent paths
+   * ("/Users/me/proj" → "~/proj"), mirroring Cursor's project switcher.
+   * Empty string when the daemon hasn't reported it yet (paths render
+   * verbatim in that case).
+   */
+  recentHomeDir: string;
   promptTemplates: PromptTemplateSummary[];
   defaultDesignSystemId: string | null;
   config: AppConfig;
   agents: AgentInfo[];
   // Per-resource loading flags. Each tab gates its own content on whichever
   // flag matches the data it renders, so a slow `/api/agents` probe does
-  // not block tabs that don't need agents. Templates are not gated here —
-  // the sidebar 'From template' tab renders an empty state until they
-  // arrive (fast fetch), which keeps the prop surface narrower.
+  // not block tabs that don't need agents.
   skillsLoading?: boolean;
   designSystemsLoading?: boolean;
   projectsLoading?: boolean;
   promptTemplatesLoading?: boolean;
-  onCreateProject: (input: CreateInput & { pendingPrompt?: string }) => void;
-  onImportClaudeDesign: (file: File) => Promise<void> | void;
-  onImportFolder?: (baseDir: string) => Promise<void> | void;
+  /**
+   * Per RFC project-as-unit: the only way to start a new project is to
+   * open a folder. Required (no longer optional like the pre-RFC sidebar
+   * panel where it was an alternative path).
+   */
+  onImportFolder: (baseDir: string) => Promise<void> | void;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
@@ -102,24 +104,6 @@ function loadSidebarWidth(): number {
   } catch {
     return SIDEBAR_DEFAULT;
   }
-}
-
-function applyConnectorStatuses(
-  current: ConnectorDetail[],
-  statuses: ConnectorStatusResponse['statuses'],
-): ConnectorDetail[] {
-  if (!Object.keys(statuses).length) return current;
-  return current.map((connector) => {
-    const next = statuses[connector.id];
-    if (!next) return connector;
-    const { accountLabel: _accountLabel, lastError: _lastError, ...base } = connector;
-    return {
-      ...base,
-      status: next.status,
-      ...(next.accountLabel === undefined ? {} : { accountLabel: next.accountLabel }),
-      ...(next.lastError === undefined ? {} : { lastError: next.lastError }),
-    };
-  });
 }
 
 export function sortConnectorsForDisplay(connectors: ConnectorDetail[]): ConnectorDetail[] {
@@ -216,7 +200,8 @@ export function EntryView({
   skills,
   designSystems,
   projects,
-  templates,
+  recentProjects,
+  recentHomeDir,
   promptTemplates,
   defaultDesignSystemId,
   config,
@@ -225,8 +210,6 @@ export function EntryView({
   designSystemsLoading = false,
   projectsLoading = false,
   promptTemplatesLoading = false,
-  onCreateProject,
-  onImportClaudeDesign,
   onImportFolder,
   onOpenProject,
   onOpenLiveArtifact,
@@ -244,11 +227,20 @@ export function EntryView({
     useState<PromptTemplateSummary | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => loadSidebarWidth());
   const [resizing, setResizing] = useState(false);
-  const [connectors, setConnectors] = useState<ConnectorDetail[]>([]);
-  const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [petRailHidden, setPetRailHiddenState] = useState<boolean>(() => loadPetRailHidden());
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
+  // Folder-picker dialog state. Single dialog instance shared by every
+  // "click to pick a folder" entry point (sidebar hero, switcher popover
+  // bottom action, switcher popover input fallback). `pickerInitial` is
+  // optional — defaults to the daemon-reported home dir.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerInitial, setPickerInitial] = useState<string | undefined>(undefined);
+
+  function openFolderPicker(initialPath?: string) {
+    setPickerInitial(initialPath ?? (recentHomeDir || undefined));
+    setPickerOpen(true);
+  }
 
   function setPetRailHidden(next: boolean) {
     setPetRailHiddenState(next);
@@ -277,17 +269,18 @@ export function EntryView({
       : t('settings.noAgentSelected');
   }, [config.mode, config.model, config.baseUrl, currentAgent, t]);
 
-  // 'Use this prompt' on an example card is a fast path — skip the form and
-  // create the project immediately with sane defaults derived from the skill,
-  // seeding the chat composer with the example prompt via pendingPrompt.
-  function usePromptFromSkill(skill: SkillSummary) {
-    onCreateProject({
-      name: skill.name,
-      skillId: skill.id,
-      designSystemId: null,
-      metadata: metadataForSkill(skill),
-      pendingPrompt: skill.examplePrompt || skill.description,
-    });
+  // Per RFC project-as-unit: 'Use this prompt' on an Examples card no
+  // longer auto-creates a project — every project is now a folder, so the
+  // user has to open one first. The button is preserved for discoverability
+  // but routed through a stub that points the user at the homepage banner's
+  // "Open Folder…" CTA. A future slice will redesign Examples around
+  // facets-inside-a-project (RFC §"Modes are facets").
+  function usePromptFromSkill(_skill: SkillSummary) {
+    if (typeof window !== 'undefined') {
+      window.alert(
+        "Examples now live inside a project folder. Open a folder first using the homepage banner, then create a facet from this skill.",
+      );
+    }
   }
 
   function previewDesignSystem(id: string) {
@@ -298,10 +291,6 @@ export function EntryView({
     () => (previewSystemId ? designSystems.find((d) => d.id === previewSystemId) ?? null : null),
     [designSystems, previewSystemId],
   );
-
-  function handleCreate(input: CreateInput) {
-    onCreateProject(input);
-  }
 
   const startWidthRef = useRef(0);
   const startXRef = useRef(0);
@@ -337,51 +326,13 @@ export function EntryView({
     }
   }, [sidebarWidth]);
 
-  const reloadConnectorStatuses = useCallback(async () => {
-    const statuses = await fetchConnectorStatuses();
-    setConnectors((curr) => applyConnectorStatuses(curr, statuses));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Fetch connectors on mount so the New project panel can show
-    // already-configured connectors on the live-artifact tab without
-    // waiting for the user to open the Settings → Connectors surface.
-    setConnectorsLoading(true);
-    (async () => {
-      const next = await fetchConnectors();
-      if (cancelled) return;
-      setConnectors(next);
-      setConnectorsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      const data = event.data;
-      if (!data || typeof data !== 'object' || (data as { type?: unknown }).type !== CONNECTOR_CALLBACK_MESSAGE_TYPE) return;
-      if (!isTrustedConnectorCallbackOrigin(event.origin)) return;
-      void reloadConnectorStatuses();
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [reloadConnectorStatuses]);
-
-  // When the OAuth flow is handed off to the user's system browser (desktop
-  // shell opens connector auth URLs externally rather than in an Electron
-  // popup), the callback page has no `window.opener` to postMessage back to.
-  // Refresh connector statuses whenever the window regains focus so the UI
-  // picks up a just-completed connection without manual intervention.
-  useEffect(() => {
-    function onFocus() {
-      void reloadConnectorStatuses();
-    }
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [reloadConnectorStatuses]);
+  // Connector list / OAuth status refresh used to live here to populate the
+  // pre-RFC NewProjectPanel's live-artifact tab. With the panel removed,
+  // connectors now load lazily inside the Settings dialog only — no need to
+  // pre-fetch them on the home screen. The `applyConnectorStatuses` helper
+  // and `CONNECTOR_CALLBACK_MESSAGE_TYPE` constant are kept above so the
+  // OAuth callback handler in `apps/web/src/oauth-callback.html` can still
+  // postMessage to a future settings panel.
 
   // Dismiss the avatar dropdown on outside-click / Escape so it behaves
   // like the project-view AvatarMenu (which uses the same shell CSS).
@@ -457,7 +408,23 @@ export function EntryView({
 
   return (
     <div className="entry-shell">
-      <AppChromeHeader actions={avatarMenu} />
+      <AppChromeHeader actions={avatarMenu}>
+        <ProjectSwitcherTrigger
+          activeLabel="Home"
+          recentProjects={recentProjects}
+          homeDir={recentHomeDir}
+          onImportFolder={onImportFolder}
+          onOpenPicker={openFolderPicker}
+        />
+      </AppChromeHeader>
+      <FolderPickerDialog
+        open={pickerOpen}
+        initialPath={pickerInitial}
+        onClose={() => setPickerOpen(false)}
+        onOpen={(p) => {
+          void onImportFolder(p);
+        }}
+      />
       <div
         className={`entry${petRailHidden ? '' : ' has-pet-rail'}`}
         style={{
@@ -467,21 +434,7 @@ export function EntryView({
         }}
       >
       <aside className="entry-side" style={{ width: sidebarWidth }}>
-        <NewProjectPanel
-          skills={skills}
-          designSystems={designSystems}
-          defaultDesignSystemId={defaultDesignSystemId}
-          templates={templates}
-          promptTemplates={promptTemplates}
-          onCreate={handleCreate}
-          onImportClaudeDesign={onImportClaudeDesign}
-          onImportFolder={onImportFolder}
-          mediaProviders={config.mediaProviders}
-          connectors={connectors}
-          connectorsLoading={connectorsLoading}
-          onOpenConnectorsTab={() => onOpenSettings('composio')}
-          loading={skillsLoading || designSystemsLoading}
-        />
+        <SidebarHero onOpenPicker={openFolderPicker} />
         <div className="entry-side-foot">
           <div className="entry-side-foot-row">
             <button
@@ -689,55 +642,509 @@ function TopTabButton({
   );
 }
 
-// Map a skill's declared mode to project metadata. Falls back to the same
-// defaults the new-project form would apply (high-fidelity prototype, no
-// speaker notes on decks, no template animations) so 'Use this prompt'
-// produces a project indistinguishable from one created via the form. Per-
-// skill hints in SKILL.md frontmatter (od.fidelity, od.speaker_notes,
-// od.animations) override the defaults so each example reproduces the
-// shipped example.html — e.g. wireframe-sketch declares fidelity:wireframe.
-function metadataForSkill(skill: SkillSummary): ProjectMetadata {
-  const kind = kindForSkill(skill);
-  if (kind === 'prototype') {
-    return { kind, fidelity: skill.fidelity ?? 'high-fidelity' };
+/**
+ * Project-switcher trigger — a header chip ("Home ▾" on the home view,
+ * project name when one is open) that toggles a Cursor-style popover
+ * containing the recents list + Open Folder action. Lifted out of the
+ * sidebar so the project switcher works the same way on the home screen
+ * and inside a project (slice 5 will reuse this trigger in the project
+ * shell's chrome).
+ *
+ * Mouse + keyboard interaction follows the existing avatar menu pattern
+ * elsewhere in this file: outside-click closes, Escape closes, the
+ * trigger advertises `aria-haspopup`/`aria-expanded` for screen readers.
+ */
+function ProjectSwitcherTrigger({
+  activeLabel,
+  recentProjects,
+  homeDir,
+  onImportFolder,
+  onOpenPicker,
+}: {
+  /** Text shown in the trigger button. "Home" on the launcher; the
+   *  project's display name once a project is open. */
+  activeLabel: string;
+  recentProjects: RecentProjectEntry[];
+  homeDir: string;
+  onImportFolder?: (path: string) => Promise<void> | void;
+  /** Open the in-app folder picker dialog. Used as the click-to-pick
+   *  fallback when `window.electronAPI.pickFolder` is unavailable. */
+  onOpenPicker?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // The popover renders with `position: fixed` so it can escape the
+  // header's `overflow: hidden` clip (`.app-chrome-content` clips its
+  // descendants). We re-measure the trigger every time the popover
+  // opens (and on viewport resize while open) so the popover sticks to
+  // the trigger as the window resizes.
+  const [anchorRect, setAnchorRect] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+
+  function refreshAnchor() {
+    const btn = triggerRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    setAnchorRect({ left: r.left, top: r.bottom + 4 });
   }
-  if (kind === 'deck') {
-    return {
-      kind,
-      speakerNotes:
-        typeof skill.speakerNotes === 'boolean' ? skill.speakerNotes : false,
+
+  useEffect(() => {
+    if (!open) return;
+    refreshAnchor();
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
-  }
-  if (kind === 'template') {
-    return {
-      kind,
-      animations:
-        typeof skill.animations === 'boolean' ? skill.animations : false,
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
     };
-  }
-  if (kind === 'image') {
-    return { kind, imageModel: DEFAULT_IMAGE_MODEL, imageAspect: '1:1' };
-  }
-  if (kind === 'video') {
-    return { kind, videoModel: DEFAULT_VIDEO_MODEL, videoAspect: '16:9', videoLength: 5 };
-  }
-  if (kind === 'audio') {
-    return {
-      kind,
-      audioKind: 'speech',
-      audioModel: DEFAULT_AUDIO_MODEL.speech,
-      audioDuration: 10,
+    const onResize = () => refreshAnchor();
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
     };
-  }
-  return { kind: 'other' };
+  }, [open]);
+
+  // Close after a successful open — the trigger label is about to change
+  // anyway when the project view loads, so keeping the popover up would
+  // flash stale state.
+  const handleImportFolder = onImportFolder
+    ? async (p: string) => {
+        await onImportFolder(p);
+        setOpen(false);
+      }
+    : undefined;
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="project-switcher-trigger"
+        data-testid="project-switcher-trigger"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Switch project"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 8px',
+          background: open ? 'var(--surface-hover, rgba(0,0,0,0.06))' : 'transparent',
+          border: 'none',
+          borderRadius: 6,
+          color: 'inherit',
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: 'pointer',
+          // -webkit-app-region opt-out so the button stays clickable in
+          // the macOS title-bar drag region (the rest of the chrome is
+          // draggable via the `app-chrome-drag` element).
+          WebkitAppRegion: 'no-drag',
+        } as React.CSSProperties}
+      >
+        <span>{activeLabel}</span>
+        <Icon name="chevron-down" size={12} />
+      </button>
+      {open && anchorRect ? (
+        <div
+          ref={popoverRef}
+          role="menu"
+          data-testid="project-switcher-popover"
+          style={{
+            position: 'fixed',
+            left: anchorRect.left,
+            top: anchorRect.top,
+            zIndex: 1000,
+            width: 360,
+            maxWidth: 'calc(100vw - 24px)',
+            background: 'var(--surface, var(--surface-soft, #fff))',
+            border: '1px solid var(--border-soft)',
+            borderRadius: 10,
+            boxShadow: '0 8px 28px rgba(0, 0, 0, 0.18)',
+            padding: '10px 8px 8px',
+            // Constrain to viewport so a long Recents list doesn't push
+            // the popover off-screen on small displays.
+            maxHeight: 'min(70vh, 520px)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <ProjectSwitcherPanel
+            recentProjects={recentProjects}
+            homeDir={homeDir}
+            onImportFolder={handleImportFolder}
+            onOpenPicker={
+              onOpenPicker
+                ? () => {
+                    setOpen(false);
+                    onOpenPicker();
+                  }
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
+    </>
+  );
 }
 
-function kindForSkill(skill: SkillSummary): ProjectKind {
-  if (skill.mode === 'deck') return 'deck';
-  if (skill.mode === 'prototype') return 'prototype';
-  if (skill.mode === 'template') return 'template';
-  if (skill.mode === 'image' || skill.surface === 'image') return 'image';
-  if (skill.mode === 'video' || skill.surface === 'video') return 'video';
-  if (skill.mode === 'audio' || skill.surface === 'audio') return 'audio';
-  return 'other';
+/**
+ * Sidebar hero shown on the home screen. The full project switcher now
+ * lives in the header popover (see `ProjectSwitcherTrigger`), so the
+ * sidebar is just a friendly explainer + a single shortcut to the
+ * folder picker. Still useful: gives the empty homepage a focal point
+ * and a one-click escape route from "what do I do here?".
+ *
+ * The "Open Folder…" button prefers the native Electron picker when
+ * available (better UX on macOS/Windows) and falls back to the
+ * in-app `FolderPickerDialog` otherwise (browser dev / headless tests
+ * / Linux distros without a system dialog). The fallback dialog talks
+ * to the daemon's `/api/fs/ls` endpoint to walk real OS paths — which
+ * is what the project-as-unit model needs (web-only `<input
+ * webkitdirectory>` returns a virtualized path the daemon can't read).
+ */
+function SidebarHero({
+  onOpenPicker,
+}: {
+  /** Open the in-app folder picker dialog. EntryView routes the
+   *  confirmed path through `onImportFolder` for both this hero and the
+   *  switcher popover, so the dialog only needs an opener here. */
+  onOpenPicker: () => void;
+}) {
+  return (
+    <div
+      className="entry-sidebar-hero"
+      data-testid="entry-sidebar-hero"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        padding: 24,
+        flex: 1,
+        minHeight: 0,
+        overflow: 'auto',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+          Open a folder to begin
+        </h2>
+        <p style={{ fontSize: 13, color: 'var(--text-faint)', margin: 0, lineHeight: 1.55 }}>
+          A project is a folder on your disk. Open one and Open Design
+          generates everything — sources, brand, facets — inside it.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        className="foot-pill"
+        onClick={onOpenPicker}
+        data-testid="sidebar-hero-pick"
+        style={{
+          justifyContent: 'center',
+          padding: '10px 14px',
+          fontWeight: 600,
+          fontSize: 13,
+        }}
+      >
+        <Icon name="folder" size={14} />
+        <span>Open Folder…</span>
+      </button>
+
+      <p
+        style={{
+          fontSize: 12,
+          color: 'var(--text-faint)',
+          margin: 0,
+          lineHeight: 1.55,
+        }}
+      >
+        Or click <strong>Home ▾</strong> in the title bar to switch
+        between recent folders.
+      </p>
+    </div>
+  );
 }
+
+/**
+ * Popover-content version of the project switcher. Renders the search
+ * input, "Recents" list, and bottom Open Folder action — exactly the
+ * three groups in Cursor's reference popover (`docs/.../image-…png`).
+ *
+ * The search input is also the manual-path fallback: when the typed text
+ * doesn't match any recent entry and the user presses Enter (or clicks
+ * the matching action), it's treated as a path to open. `~/` is expanded
+ * client-side using the daemon-reported home dir so users can paste
+ * `~/projects/foo` exactly as they would in a terminal.
+ */
+function ProjectSwitcherPanel({
+  recentProjects,
+  homeDir,
+  onImportFolder,
+  onOpenPicker,
+}: {
+  recentProjects: RecentProjectEntry[];
+  homeDir: string;
+  onImportFolder?: (path: string) => Promise<void> | void;
+  /** Open the in-app folder picker dialog. The popover prefers the
+   *  native Electron picker when available; the dialog is the
+   *  cross-platform fallback driven by the daemon's `/api/fs/ls`. */
+  onOpenPicker?: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const hasElectronPicker =
+    typeof window !== 'undefined' && typeof window.electronAPI?.pickFolder === 'function';
+
+  // Filter the recent list against the query. Match against both the
+  // tildified label (what the user sees) and the raw absolute path so
+  // typing the basename or the leading `~/...` both work. Empty query
+  // shows the full list so the panel still feels populated on first load.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return recentProjects;
+    return recentProjects.filter((entry) => {
+      const label = tildify(entry.path, homeDir).toLowerCase();
+      return label.includes(q) || entry.path.toLowerCase().includes(q);
+    });
+  }, [query, recentProjects, homeDir]);
+
+  async function handlePick() {
+    if (!onImportFolder || !hasElectronPicker) return;
+    setBusy(true);
+    try {
+      const picked = await window.electronAPI!.pickFolder!();
+      if (!picked) return;
+      await onImportFolder(picked);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleOpenEntry(p: string) {
+    if (!onImportFolder || busy) return;
+    void onImportFolder(p);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onImportFolder) return;
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    // If the query exactly matches a tildified label or absolute path,
+    // re-use that entry (de-dupes against the canonical realpath the
+    // daemon returned). Otherwise treat the input as a fresh path.
+    const exactRecent = recentProjects.find(
+      (e2) => tildify(e2.path, homeDir) === trimmed || e2.path === trimmed,
+    );
+    const target = exactRecent ? exactRecent.path : expandHome(trimmed, homeDir);
+    setBusy(true);
+    try {
+      await onImportFolder(target);
+      setQuery('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="project-switcher-panel"
+      data-testid="project-switcher-panel"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0,
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <form onSubmit={handleSubmit} style={{ marginBottom: 8, padding: '0 4px' }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Open a folder…"
+          spellCheck={false}
+          autoComplete="off"
+          data-testid="project-switcher-input"
+          disabled={busy}
+          style={{
+            width: '100%',
+            padding: '8px 10px',
+            border: '1px solid var(--border-soft)',
+            borderRadius: 6,
+            background: 'var(--surface-soft, transparent)',
+            fontSize: 13,
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        />
+      </form>
+
+      {recentProjects.length > 0 ? (
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: 'var(--text-faint)',
+            padding: '6px 8px 4px',
+            letterSpacing: 0.2,
+          }}
+        >
+          Recents
+        </div>
+      ) : null}
+
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          margin: '0 -4px',
+        }}
+      >
+        {filtered.map((entry) => (
+          <SwitcherRow
+            key={entry.path}
+            label={tildify(entry.path, homeDir)}
+            title={entry.path}
+            onClick={() => handleOpenEntry(entry.path)}
+          />
+        ))}
+        {recentProjects.length > 0 && filtered.length === 0 ? (
+          <div
+            style={{
+              padding: '10px 12px',
+              fontSize: 12,
+              color: 'var(--text-faint)',
+            }}
+          >
+            No matches. Press Enter to open “{query.trim()}”.
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        style={{
+          borderTop: '1px solid var(--border-soft)',
+          paddingTop: 6,
+          margin: '0 -4px',
+        }}
+      >
+        <SwitcherRow
+          label={busy ? 'Opening…' : 'Open Folder…'}
+          onClick={hasElectronPicker ? handlePick : (onOpenPicker ?? (() => {}))}
+          testId="project-switcher-pick"
+          disabled={busy || (!hasElectronPicker && !onOpenPicker)}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One row in the Cursor-style project switcher. A folder icon followed
+ * by a single line of text. Hover gives the standard list-item feel
+ * (subtle bg) without leaning on a class that lives elsewhere — keeps
+ * the component self-contained.
+ */
+function SwitcherRow({
+  label,
+  title,
+  onClick,
+  testId,
+  disabled,
+}: {
+  label: string;
+  title?: string;
+  onClick: () => void;
+  testId?: string;
+  disabled?: boolean;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      data-testid={testId ?? 'project-switcher-row'}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={title ?? label}
+      disabled={disabled}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        padding: '7px 10px',
+        background: hover && !disabled ? 'var(--surface-hover, rgba(0,0,0,0.04))' : 'transparent',
+        border: 'none',
+        borderRadius: 6,
+        textAlign: 'left',
+        cursor: disabled ? 'default' : 'pointer',
+        color: 'inherit',
+        fontSize: 13,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <Icon name="folder" size={14} />
+      <span
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Convert an absolute path to its `~/`-prefixed display form when it
+ * lives under `homeDir`. Falls back to the raw path otherwise. Trailing
+ * slashes are normalized so `/Users/me/` and `/Users/me` both produce
+ * `~`. Inverse of `expandHome`.
+ */
+export function tildify(absPath: string, homeDir: string): string {
+  if (!absPath) return absPath;
+  if (!homeDir) return absPath;
+  const home = homeDir.replace(/[\\/]+$/, '');
+  if (!home) return absPath;
+  if (absPath === home) return '~';
+  if (absPath.startsWith(home + '/')) return '~/' + absPath.slice(home.length + 1);
+  if (absPath.startsWith(home + '\\')) return '~\\' + absPath.slice(home.length + 1);
+  return absPath;
+}
+
+/**
+ * Expand a leading `~` / `~/...` segment into an absolute path using the
+ * daemon-reported home dir. Inverse of `tildify`. Inputs that don't
+ * start with `~` are returned unchanged so absolute or workspace-relative
+ * paths still round-trip through `/api/projects/open` (the daemon
+ * resolves both).
+ */
+export function expandHome(input: string, homeDir: string): string {
+  if (!input) return input;
+  if (!homeDir) return input;
+  if (input === '~') return homeDir;
+  if (input.startsWith('~/') || input.startsWith('~\\')) {
+    return homeDir.replace(/[\\/]+$/, '') + input.slice(1);
+  }
+  return input;
+}
+

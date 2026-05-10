@@ -41,6 +41,17 @@ od:
 Allowed values match the file names in this directory minus the `.md`
 extension. Unknown values are silently ignored (forward-compatible).
 
+### Project-local overrides
+
+Resolution is two-layered. The repo-shipped files in this directory are
+the base layer. A user project may also place a `craft/` subdirectory at
+its project root (see [`docs/rfc-drafts/project-as-unit.md`](../docs/rfc-drafts/project-as-unit.md));
+when present, slugs found there win over the repo copy on conflict, so
+projects can tailor or extend craft rules without forking this repo.
+Slugs not overridden in the project still come from the repo, and a
+`--strict-craft` daemon flag will be added (separate change) for setups
+that want to lock craft to repo-managed files only.
+
 ### Why silent fallback instead of fail-fast?
 
 A skeptical reader will ask: "If a skill requests a planned-but-not-yet-vendored

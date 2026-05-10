@@ -57,3 +57,5 @@ specs/change/active
 .envrc
 # Local design assistant context
 .impeccable.md
+
+.pnpm-store/*
