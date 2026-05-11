@@ -26,6 +26,12 @@ import { apiProtocolLabel } from '../utils/apiProtocol';
 
 type TopTab = 'designs' | 'examples' | 'design-systems' | 'image-templates' | 'video-templates';
 
+// sessionStorage key for the "Use this prompt" hand-off. Read once by
+// ProjectView after the user picks a folder, then cleared. Kept as a
+// module-level constant so both writers (EntryView) and readers
+// (ProjectView) can't drift out of sync.
+export const PENDING_EXAMPLE_KEY = 'open-design:pending-example';
+
 interface Props {
   skills: SkillSummary[];
   designSystems: DesignSystemSummary[];
@@ -269,18 +275,29 @@ export function EntryView({
       : t('settings.noAgentSelected');
   }, [config.mode, config.model, config.baseUrl, currentAgent, t]);
 
-  // Per RFC project-as-unit: 'Use this prompt' on an Examples card no
-  // longer auto-creates a project — every project is now a folder, so the
-  // user has to open one first. The button is preserved for discoverability
-  // but routed through a stub that points the user at the homepage banner's
-  // "Open Folder…" CTA. A future slice will redesign Examples around
-  // facets-inside-a-project (RFC §"Modes are facets").
-  function usePromptFromSkill(_skill: SkillSummary) {
-    if (typeof window !== 'undefined') {
-      window.alert(
-        "Examples now live inside a project folder. Open a folder first using the homepage banner, then create a facet from this skill.",
+  // RFC project-as-unit: every facet lives inside a folder the user
+  // owns, so 'Use this prompt' can no longer create a project on the
+  // fly. Instead we stash the user's intent (skill + example prompt)
+  // in sessionStorage, then open the folder picker. After the user
+  // picks a folder, ProjectView mounts and consumes the stash on
+  // first render — auto-selecting the skill and pre-filling the
+  // composer with the example prompt. Single-use; the stash is
+  // cleared after consumption so reloading later doesn't replay it.
+  function usePromptFromSkill(skill: SkillSummary) {
+    try {
+      window.sessionStorage.setItem(
+        PENDING_EXAMPLE_KEY,
+        JSON.stringify({
+          skillId: skill.id,
+          prompt: skill.examplePrompt ?? '',
+          createdAt: Date.now(),
+        }),
       );
+    } catch {
+      // Safari private mode etc. — fall back to opening the picker
+      // without the stash; user just doesn't get auto-prefill.
     }
+    openFolderPicker();
   }
 
   function previewDesignSystem(id: string) {

@@ -1,9 +1,9 @@
-# Open Design
+# Open Make
 
 > **[Claude Design][cd] 的開源替代品。** 本地優先、可部署到 Vercel、每一層都 BYOK —— **16 套 coding-agent CLI** 在 `PATH` 上自動檢測（Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI）就是設計引擎，由 **31 個可組合 Skills** 和 **72 套品牌級 Design System** 驅動。一個都沒裝？還有 OpenAI 相容的 BYOK 代理 `/api/proxy/stream` 備援，同一條 loop，少一次 spawn 而已。
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Design 封面：與本地 AI 智慧體共同設計" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Make 封面：與本地 AI 智慧體共同設計" width="100%" />
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@
 
 Anthropic 的 [Claude Design][cd]（2026-04-17 釋出，基於 Opus 4.7）讓大家第一次看到：當一個 LLM 不再寫廢話、開始直接交付設計成品，會是什麼樣子。它瞬間爆紅 —— 然後保持**閉源**、付費、只跑在雲上、綁定 Anthropic 的模型和 Anthropic 的內部 skill。沒有 checkout，沒有自託管，沒有 Vercel 部署，也換不了自己的 agent。
 
-**Open Design（OD）就是它的開源替代品。** 同一套 loop、同一種「artifact-first」心智模型，但沒有鎖定。我們不做 agent —— 你筆記本上最強的 coding agent 已經裝好了。我們要做的，是把它接進一個 skill 驅動的設計工作流：本地用 `pnpm tools-dev` 跑完整本地閉環，雲端可單獨部署 Web 層，每一層都 BYOK（自帶 Key）。
+**Open Make（OD）就是它的開源替代品。** 同一套 loop、同一種「artifact-first」心智模型，但沒有鎖定。我們不做 agent —— 你筆記本上最強的 coding agent 已經裝好了。我們要做的，是把它接進一個 skill 驅動的設計工作流：本地用 `pnpm tools-dev` 跑完整本地閉環，雲端可單獨部署 Web 層，每一層都 BYOK（自帶 Key）。
 
 輸入「幫我做一份雜誌風的種子輪 pitch deck」。在模型揮灑第一個畫素之前，**初始化問題表單**已經先跳出來。Agent 從 5 套精選的視覺方向裡選一個。一張動態的 `TodoWrite` 計畫卡片即時流入 UI。Daemon 在磁碟上構建出一個真實的專案目錄，裡面有 seed 模板、佈局庫、自檢 checklist。Agent **強制 pre-flight** 讀取它們，對自己的輸出跑一輪**五維評審**，幾秒後吐出一個 `<artifact>`，渲染在沙盒 iframe 裡。
 
@@ -272,7 +272,7 @@ DISCOVERY 指令         （turn-1 表單、turn-2 品牌分支、TodoWrite、�
    │  /api/upload         /api/projects/:id/files…
    │  /artifacts (靜態)   /frames (靜態)
    │
-   │  可選 sidecar IPC：/tmp/open-design/ipc/<ns>/<app>.sock
+   │  可選 sidecar IPC：/tmp/open-make/ipc/<ns>/<app>.sock
    │  （STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN）
    └─────────┬───────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -300,7 +300,7 @@ DISCOVERY 指令         （turn-1 表單、turn-2 品牌分支、TodoWrite、�
 
 ### 下載桌面端（不需建置）
 
-試用 Open Design 最快的方式是直接下載預編譯的桌面端 —— 不用裝 Node、不用 pnpm、不用 clone：
+試用 Open Make 最快的方式是直接下載預編譯的桌面端 —— 不用裝 Node、不用 pnpm、不用 clone：
 
 - **[open-design.ai](https://open-design.ai/)** —— 官方下載頁
 - **[GitHub releases](https://github.com/nexu-io/open-design/releases)**
@@ -309,7 +309,7 @@ DISCOVERY 指令         （turn-1 表單、turn-2 品牌分支、TodoWrite、�
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-design
+cd open-make
 corepack enable
 corepack pnpm --version   # 應輸出 10.33.2
 pnpm install
@@ -351,7 +351,7 @@ Daemon 在倉庫根下維護一個隱藏目錄，裡面所有內容都已 gitign
 
 ## 跑專案
 
-Open Design 可以跑成瀏覽器裡的 web app，也可以跑成 Electron 桌面版。兩種模式共用同一套本機 daemon + web 架構。
+Open Make 可以跑成瀏覽器裡的 web app，也可以跑成 Electron 桌面版。兩種模式共用同一套本機 daemon + web 架構。
 
 ### Web / Localhost（預設）
 
@@ -388,7 +388,7 @@ pnpm tools-dev
 pnpm tools-dev inspect desktop status
 
 # 對桌面版截圖
-pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
+pnpm tools-dev inspect desktop screenshot --path /tmp/open-make.png
 ```
 
 桌面版透過 sidecar IPC 自動探得 web URL —— 不用猜埠。
@@ -405,22 +405,22 @@ pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
 
 固定埠重啟、背景啟動、完整排錯 → [`QUICKSTART.zh-TW.md`](QUICKSTART.zh-TW.md)。
 
-## 從 coding agent 端使用 Open Design
+## 從 coding agent 端使用 Open Make
 
-Open Design 內建一個 stdio MCP server。把它接進 Claude Code、Codex、Cursor、VS Code、Antigravity、Zed、Windsurf，或任何相容 MCP 的 client，另一個 repo 裡的 agent 就能直接讀取你本機 Open Design 專案裡的檔案。整個 export-then-attach 迴圈被取代掉。當 agent 呼叫 `search_files`、`get_file`、`get_artifact` 沒帶 project 參數時，MCP 預設指向你 Open Design 當下開著的那個專案（與檔案）—— 所以 *「在我的 app 裡蓋這個」*、*「對齊這套樣式」* 這類提示直接就能用。
+Open Make 內建一個 stdio MCP server。把它接進 Claude Code、Codex、Cursor、VS Code、Antigravity、Zed、Windsurf，或任何相容 MCP 的 client，另一個 repo 裡的 agent 就能直接讀取你本機 Open Make 專案裡的檔案。整個 export-then-attach 迴圈被取代掉。當 agent 呼叫 `search_files`、`get_file`、`get_artifact` 沒帶 project 參數時，MCP 預設指向你 Open Make 當下開著的那個專案（與檔案）—— 所以 *「在我的 app 裡蓋這個」*、*「對齊這套樣式」* 這類提示直接就能用。
 
 **為什麼選 MCP？** 每改一版設計就匯出再重附 zip，會打斷節奏。MCP server 把你的設計原始碼直接暴露成結構化 API —— 設計 token CSS、JSX 元件、入口 HTML —— agent 可以照名字查詢。Agent 永遠看到的是當下這版檔案，不是上次匯出時的舊版。
 
-在 Open Design app 裡打開 **Settings → MCP server** 就有逐 client 的安裝流程。面板會把 `node` 二進位的絕對路徑、daemon 編好的 `cli.js` 路徑，烘進每段 snippet —— 所以即使是剛 clone 下來、`od` 不在 PATH 上的環境也能用。Cursor 給一鍵 deeplink；其它 client 給可貼上的 JSON snippet（Claude Code 還附帶 `claude mcp add-json` 一行指令，不必手改 `~/.claude.json`）。裝完之後重啟或 reload 你的 client，server 才會出現。
+在 Open Make app 裡打開 **Settings → MCP server** 就有逐 client 的安裝流程。面板會把 `node` 二進位的絕對路徑、daemon 編好的 `cli.js` 路徑，烘進每段 snippet —— 所以即使是剛 clone 下來、`od` 不在 PATH 上的環境也能用。Cursor 給一鍵 deeplink；其它 client 給可貼上的 JSON snippet（Claude Code 還附帶 `claude mcp add-json` 一行指令，不必手改 `~/.claude.json`）。裝完之後重啟或 reload 你的 client，server 才會出現。
 
-MCP 工具呼叫成功的前提是 daemon 在本機跑著。如果 agent 是在 Open Design 起來之前就啟動，等 OD 起來後請重啟 agent，它才連得上活的 daemon。Daemon 不在線時的工具呼叫會回 `"daemon not reachable"` 的明確錯誤，不會 crash。
+MCP 工具呼叫成功的前提是 daemon 在本機跑著。如果 agent 是在 Open Make 起來之前就啟動，等 OD 起來後請重啟 agent，它才連得上活的 daemon。Daemon 不在線時的工具呼叫會回 `"daemon not reachable"` 的明確錯誤，不會 crash。
 
-**安全性。** MCP server 是唯讀的 —— 它只暴露檔案讀取、檔案 metadata、搜尋，沒有任何寫盤或呼叫外部服務的能力。它在 coding agent 下面以子行程身份透過 stdio 跑；任何你註冊上的 MCP client 都會繼承本機 Open Design 專案的讀取權限。把它當作裝 VS Code 擴充套件那樣對待 —— 只註冊你信得過的 client。Daemon 預設綁到 `127.0.0.1`；要讓區網內的機器也能連，得明確設 `OD_BIND_HOST`。
+**安全性。** MCP server 是唯讀的 —— 它只暴露檔案讀取、檔案 metadata、搜尋，沒有任何寫盤或呼叫外部服務的能力。它在 coding agent 下面以子行程身份透過 stdio 跑；任何你註冊上的 MCP client 都會繼承本機 Open Make 專案的讀取權限。把它當作裝 VS Code 擴充套件那樣對待 —— 只註冊你信得過的 client。Daemon 預設綁到 `127.0.0.1`；要讓區網內的機器也能連，得明確設 `OD_BIND_HOST`。
 
 ## 倉庫結構
 
 ```
-open-design/
+open-make/
 ├── README.md                      ← 英文
 ├── README.de.md                   ← Deutsch
 ├── README.zh-CN.md                ← 简体中文
@@ -456,7 +456,7 @@ open-design/
 │
 ├── packages/
 │   ├── contracts/                 ← web/daemon 共享 app contracts
-│   ├── sidecar-proto/             ← Open Design sidecar protocol contract
+│   ├── sidecar-proto/             ← Open Make sidecar protocol contract
 │   ├── sidecar/                   ← 通用 sidecar runtime primitives
 │   └── platform/                  ← 通用 process/platform primitives
 │
@@ -603,7 +603,7 @@ OD 不只到程式碼為止。同一套產出 `<artifact>` HTML 的 chat 入口�
 
 ### HyperFrames —— HTML→MP4 動態圖形（11 條可一鍵複刻樣板）
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) 是 HeyGen 開源的 agent-native 影片框架 —— 你（或 agent）寫 HTML + CSS + GSAP，HyperFrames 透過 headless Chrome + FFmpeg 確定性地渲成 MP4。Open Design 把 HyperFrames 接成一等影片模型（`hyperframes-html`），掛進 daemon dispatch；同時帶上 `skills/hyperframes/` 這個 skill，把 timeline 合約、scene transition 規則、audio-reactive 模式、字幕 / TTS、目錄元件（`npx hyperframes add <slug>`）一起教給 agent。
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) 是 HeyGen 開源的 agent-native 影片框架 —— 你（或 agent）寫 HTML + CSS + GSAP，HyperFrames 透過 headless Chrome + FFmpeg 確定性地渲成 MP4。Open Make 把 HyperFrames 接成一等影片模型（`hyperframes-html`），掛進 daemon dispatch；同時帶上 `skills/hyperframes/` 這個 skill，把 timeline 合約、scene transition 規則、audio-reactive 模式、字幕 / TTS、目錄元件（`npx hyperframes add <slug>`）一起教給 agent。
 
 11 條 HyperFrames prompt 放在 [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/)，每一條都是產生具體某個原型的明確 brief：
 
@@ -641,7 +641,7 @@ Chat / artifact 迴圈最顯眼，但這套倉庫裡還有幾個能力被埋得�
 - **使用者自存 templates。** 喜歡某次渲染？`POST /api/templates` 把 HTML + 後設資料快照進 SQLite `templates` 表。下個專案的 picker 裡多一行「你的模板」 —— 跟內建 31 套同一個挑選面，但是你的。
 - **Tab 持久化。** 每個專案記得自己開啟的檔案和當前 tab，存在 `tabs` 表裡。明天再開啟，工作區還是你昨天離開時的樣子。
 - **Artifact lint API。** `POST /api/artifacts/lint` 對生成的 artifact 跑結構性檢查（`<artifact>` 框架是否破損、必需的副檔案是否缺失、palette token 是否過期），返回 agent 下一回合可以讀回去的 findings。五維自評審就是用它把分數落到證據上而不是 vibe。
-- **Sidecar 協議 + 桌面版自動化。** Daemon、web、desktop 程序都帶型別化的 5 欄位 stamp（`app · mode · namespace · ipc · source`），並把 JSON-RPC IPC 通道暴露在 `/tmp/open-design/ipc/<namespace>/<app>.sock`。`tools-dev inspect desktop status \| eval \| screenshot` 就跑在這條通道上，所以 headless E2E 直接打到真實 Electron 殼，不用造定製夾具（[`packages/sidecar-proto/`](packages/sidecar-proto/)、[`apps/desktop/src/main/`](apps/desktop/src/main/)）。
+- **Sidecar 協議 + 桌面版自動化。** Daemon、web、desktop 程序都帶型別化的 5 欄位 stamp（`app · mode · namespace · ipc · source`），並把 JSON-RPC IPC 通道暴露在 `/tmp/open-make/ipc/<namespace>/<app>.sock`。`tools-dev inspect desktop status \| eval \| screenshot` 就跑在這條通道上，所以 headless E2E 直接打到真實 Electron 殼，不用造定製夾具（[`packages/sidecar-proto/`](packages/sidecar-proto/)、[`apps/desktop/src/main/`](apps/desktop/src/main/)）。
 - **Windows 友好的 spawn。** 任何在長 prompt 上會撞 `CreateProcess` 32 KB argv 上限的 adapter（Codex、Gemini、OpenCode、Cursor Agent、Qwen、Qoder CLI、Pi）都改走 stdin。Claude Code 和 Copilot 保留 `-p`；連 stdin 都裝不下時 daemon 退回臨時 prompt 檔案。
 - **按 namespace 隔離的 runtime data。** `OD_DATA_DIR` 加 `--namespace` 給你完全隔離的 `.od/`-style 目錄樹，Playwright、beta channel、你正經的專案永遠不會共用同一個 SQLite 檔案。
 
@@ -658,7 +658,7 @@ Chat / artifact 迴圈最顯眼，但這套倉庫裡還有幾個能力被埋得�
 
 ## 橫向對比
 
-| 維度 | [Claude Design][cd]（Anthropic） | [Open CoDesign][ocod] | **Open Design** |
+| 維度 | [Claude Design][cd]（Anthropic） | [Open CoDesign][ocod] | **Open Make** |
 |---|---|---|---|
 | License | 閉源 | MIT | **Apache-2.0** |
 | 形態 | Web (claude.ai) | 桌面 (Electron) | **Web 應用 + 本地 daemon** |
@@ -758,7 +758,7 @@ Daemon 啟動時從 `PATH` 自動檢測，無需配置。流式分發邏輯在 [
 ## 給我們點個 Star
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="給 Open Design 點個 Star —— github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="給 Open Make 點個 Star —— github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 如果這套東西幫你省了半小時，給它一個 ★。Star 不付房租，但它告訴下一個設計師、Agent 和貢獻者：這個實驗值得他們的注意力。一次點選、三秒鐘、真實訊號：[github.com/nexu-io/open-design](https://github.com/nexu-io/open-design)。
@@ -775,10 +775,10 @@ Daemon 啟動時從 `PATH` 自動檢測，無需配置。流式分發邏輯在 [
 
 ## 貢獻者牆
 
-感謝每一位讓 Open Design 變得更好的朋友 —— 無論是寫程式碼、修文檔、提 issue、加 skill 還是加 design system，每一次真實貢獻都會被記住。下面這面牆是最直觀的「Thank you」。
+感謝每一位讓 Open Make 變得更好的朋友 —— 無論是寫程式碼、修文檔、提 issue、加 skill 還是加 design system，每一次真實貢獻都會被記住。下面這面牆是最直觀的「Thank you」。
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Design 貢獻者" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Make 貢獻者" />
 </a>
 
 第一次提 PR？歡迎從 [`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) 標籤起步。
@@ -786,7 +786,7 @@ Daemon 啟動時從 `PATH` 自動檢測，無需配置。流式分發邏輯在 [
 ## 倉庫活躍度
 
 <picture>
-  <img alt="Open Design 倉庫指標" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Make 倉庫指標" src="docs/assets/github-metrics.svg" />
 </picture>
 
 上面的 SVG 由 [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) 藉助 [`lowlighter/metrics`](https://github.com/lowlighter/metrics) 每天自動重新生成。想要立刻重新整理可以去 **Actions** 選項卡手動觸發；想開啟更豐富的外掛（traffic、follow-up time 等）可在倉庫 secrets 里加一個細粒度 PAT 命名為 `METRICS_TOKEN`。
@@ -797,7 +797,7 @@ Daemon 啟動時從 `PATH` 自動檢測，無需配置。流式分發邏輯在 [
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-09" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
-    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
+    <img alt="Open Make star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
   </picture>
 </a>
 

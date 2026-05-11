@@ -1,9 +1,9 @@
-# Open Design
+# Open Make
 
 > **[Claude Design][cd] için açık kaynak alternatif.** Yerel öncelikli, web'e dağıtılabilir, her katmanda BYOK; `PATH` üzerinde otomatik algılanan **16 coding-agent CLI** (Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI) tasarım motoruna dönüşür. Hepsi **31 birleştirilebilir Skill** ve **72 marka kalitesinde Design System** tarafından yönlendirilir. CLI yok mu? OpenAI uyumlu BYOK proxy aynı döngünün agent spawn olmadan çalışan halidir.
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Design — dizüstü bilgisayarındaki agent ile tasarım yapma editoryal kapağı" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Make — dizüstü bilgisayarındaki agent ile tasarım yapma editoryal kapağı" width="100%" />
 </p>
 
 <p align="center">
@@ -36,7 +36,7 @@
 
 Anthropic'in [Claude Design][cd] ürünü (2026-04-17'de Opus 4.7 ile yayımlandı), bir LLM düz yazı üretmeyi bırakıp tasarım artefaktları göndermeye başladığında neler olacağını gösterdi. Viral oldu; ama kapalı kaynak, ücretli, yalnızca bulutta çalışan, Anthropic modeline ve Anthropic skill'lerine kilitli bir ürün olarak kaldı. Checkout yok, self-host yok, Vercel deploy yok, kendi agent'ını takıp çıkarma yok.
 
-**Open Design (OD) açık kaynak alternatiftir.** Aynı döngü, aynı artefakt öncelikli düşünme modeli, ama kilitlenme yok. Biz bir agent göndermiyoruz; en güçlü coding agent'lar zaten dizüstü bilgisayarında yaşıyor. Onları `pnpm tools-dev` ile yerelde çalışan, web katmanı Vercel'e dağıtılabilen ve her katmanda BYOK kalan skill odaklı bir tasarım iş akışına bağlıyoruz.
+**Open Make (OD) açık kaynak alternatiftir.** Aynı döngü, aynı artefakt öncelikli düşünme modeli, ama kilitlenme yok. Biz bir agent göndermiyoruz; en güçlü coding agent'lar zaten dizüstü bilgisayarında yaşıyor. Onları `pnpm tools-dev` ile yerelde çalışan, web katmanı Vercel'e dağıtılabilen ve her katmanda BYOK kalan skill odaklı bir tasarım iş akışına bağlıyoruz.
 
 `make me a magazine-style pitch deck for our seed round` yaz. Model tek piksel uydurmadan önce etkileşimli soru formu açılır. Agent beş küratörlü görsel yönden birini seçer. Canlı bir `TodoWrite` planı UI'a akar. Daemon, seed template, layout kütüphanesi ve self-check checklist içeren gerçek bir disk üstü proje klasörü oluşturur. Agent bunları okur; pre-flight zorunludur; kendi çıktısına beş boyutlu critique uygular ve saniyeler sonra sandbox iframe içinde render edilen tek bir `<artifact>` üretir.
 
@@ -294,7 +294,7 @@ claude · codex · devin (ACP) · gemini · opencode · cursor-agent · qwen · 
 
 ### Desktop app'i indir (build gerekmez)
 
-Open Design'ı denemenin en hızlı yolu prebuilt desktop app'tir; Node yok, pnpm yok, clone yok:
+Open Make'ı denemenin en hızlı yolu prebuilt desktop app'tir; Node yok, pnpm yok, clone yok:
 
 - **[open-design.ai](https://open-design.ai/)** — resmi indirme sayfası
 - **[GitHub releases](https://github.com/nexu-io/open-design/releases)**
@@ -303,7 +303,7 @@ Open Design'ı denemenin en hızlı yolu prebuilt desktop app'tir; Node yok, pnp
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-design
+cd open-make
 corepack enable
 corepack pnpm --version   # 10.33.2 yazmalı
 pnpm install
@@ -346,7 +346,7 @@ Daemon repo root'unda gizli bir klasöre sahiptir. İçindeki her şey gitignore
 Önce repoyu çalıştırıp daha sonra paketli Desktop app'i kurduysan iki writer farklı root'lara yazar:
 
 - Repo dev-server (`pnpm tools-dev start web`) `<repo-root>/.od/` içine yazar.
-- Kurulu Desktop app `<appData>/Open Design/namespaces/<channel>/data/` altına yazar; `<appData>`, Electron'un OS bazlı app-data köküdür. Channel suffix'i **platforma özeldir**; release workflow'ları `-win`/`-linux` ekler:
+- Kurulu Desktop app `<appData>/Open Make/namespaces/<channel>/data/` altına yazar; `<appData>`, Electron'un OS bazlı app-data köküdür. Channel suffix'i **platforma özeldir**; release workflow'ları `-win`/`-linux` ekler:
 
   | Platform | `<appData>` (Electron `appData` base) | Stable channel | Beta channel |
   |---|---|---|---|
@@ -356,9 +356,9 @@ Daemon repo root'unda gizli bir klasöre sahiptir. İçindeki her şey gitignore
 
 Örnek çözümlenen path'ler:
 
-- macOS beta: `~/Library/Application Support/Open Design/namespaces/release-beta/data/`
-- Windows beta: `%APPDATA%\Open Design\namespaces\release-beta-win\data\`
-- Linux beta: `~/.config/Open Design/namespaces/release-beta-linux/data/`
+- macOS beta: `~/Library/Application Support/Open Make/namespaces/release-beta/data/`
+- Windows beta: `%APPDATA%\Open Make\namespaces\release-beta-win\data\`
+- Linux beta: `~/.config/Open Make/namespaces/release-beta-linux/data/`
 
 Emin değilsen app boot olur olmaz paketli daemon log'una bak; çözümlenen `daemonDataRoot` değerini log'lar.
 
@@ -381,14 +381,14 @@ Başarıda `.migrated-from` marker yazılır; sonraki boot'lar no-op olur.
 
 ```bash
 OD_LEGACY_DATA_DIR="/path/to/old/repo/.od" \
-  "/Applications/Open Design.app/Contents/MacOS/Open Design"
+  "/Applications/Open Make.app/Contents/MacOS/Open Make"
 ```
 
 Dock launcher istiyorsan önce `launchctl` içinde değişkeni set et, app'i aç, sonra unset et:
 
 ```bash
 launchctl setenv OD_LEGACY_DATA_DIR "/path/to/old/repo/.od"
-open "/Applications/Open Design.app"
+open "/Applications/Open Make.app"
 # Migration log satırı göründükten sonra:
 launchctl unsetenv OD_LEGACY_DATA_DIR
 ```
@@ -396,7 +396,7 @@ launchctl unsetenv OD_LEGACY_DATA_DIR
 **Linux** (env var gerçekten ulaşsın diye binary'yi doğrudan çalıştır):
 
 ```bash
-OD_LEGACY_DATA_DIR="/path/to/old/repo/.od" /path/to/open-design
+OD_LEGACY_DATA_DIR="/path/to/old/repo/.od" /path/to/open-make
 # (ör. çalıştırdığın AppImage veya /opt altındaki unpacked binary)
 ```
 
@@ -404,7 +404,7 @@ OD_LEGACY_DATA_DIR="/path/to/old/repo/.od" /path/to/open-design
 
 ```powershell
 $env:OD_LEGACY_DATA_DIR="C:\path\to\old\repo\.od"
-& "$env:LOCALAPPDATA\Programs\Open Design\Open Design.exe"
+& "$env:LOCALAPPDATA\Programs\Open Make\Open Make.exe"
 ```
 
 Daemon log'u `[od-migrate] migration complete: copied N entries (...)` kaydeder. İlk launch sonrası env variable'ı temizleyebilirsin; marker sonraki run'larda re-migration'ı engeller.
@@ -421,8 +421,8 @@ set -euo pipefail
 #    - Desktop app'ten çık (macOS'ta Cmd+Q, Linux'ta File → Exit).
 #    - Repo root'tan repo dev-server'ı durdur: `pnpm tools-dev stop`.
 # 2. REPO ve APP_DATA değerlerini gerçek path'lerine ayarla; aşağıdaki örnek macOS + beta.
-REPO="/path/to/open-design"
-APP_DATA="$HOME/Library/Application Support/Open Design/namespaces/release-beta/data"
+REPO="/path/to/open-make"
+APP_DATA="$HOME/Library/Application Support/Open Make/namespaces/release-beta/data"
 
 # 3. Preflight: Desktop app'te ne var bak.
 ls "$APP_DATA/projects" 2>/dev/null && echo "Desktop already has projects, confirm this is a replace, not a merge."
@@ -447,8 +447,8 @@ $ErrorActionPreference = 'Stop'
 #    - Desktop app'ten çık (File > Exit).
 #    - Repo root'tan repo dev-server'ı durdur: `pnpm tools-dev stop`.
 # 2. $Repo ve $AppData değerlerini gerçek path'lerine ayarla; örnek stable channel.
-$Repo    = 'C:\path\to\open-design'
-$AppData = Join-Path $env:APPDATA 'Open Design\namespaces\release-stable-win\data'
+$Repo    = 'C:\path\to\open-make'
+$AppData = Join-Path $env:APPDATA 'Open Make\namespaces\release-stable-win\data'
 
 # 3. Preflight: Desktop app'te ne var bak.
 if (Test-Path (Join-Path $AppData 'projects')) {
@@ -475,7 +475,7 @@ Relaunch sonrası bir şey yanlış görünürse `$APP_DATA` (Windows'ta `$AppDa
 > **İleri seviye: repo dev-server ve Desktop app arasında tek data dir paylaşmak.** `OD_DATA_DIR` ile iki tarafı aynı dir'e yönlendirmek mümkün ama **yalnızca aynı anda biri çalışıyorsa** güvenlidir. Daemon `app.sqlite` dosyasını WAL modunda açar ve `projects/` ile `artifacts/` altında koordine edilmemiş dosya yazar; iki writer'ı aynı anda çalıştırmak SQLite'ı bozabilir veya artefaktları clobber edebilir. Dev-server'ı başlatmadan önce Desktop app'i, Desktop app'i açmadan önce dev-server'ı daima durdur:
 >
 > ```bash
-> OD_DATA_DIR="$HOME/Library/Application Support/Open Design/namespaces/release-beta/data" \
+> OD_DATA_DIR="$HOME/Library/Application Support/Open Make/namespaces/release-beta/data" \
 >   pnpm tools-dev start web
 > ```
 
@@ -483,7 +483,7 @@ Tam dosya haritası, script'ler ve troubleshooting → [`QUICKSTART.md`](QUICKST
 
 ## Projeyi çalıştırma
 
-Open Design tarayıcıda web app veya Electron desktop app olarak çalışabilir. İki mod da aynı local daemon + web mimarisini paylaşır.
+Open Make tarayıcıda web app veya Electron desktop app olarak çalışabilir. İki mod da aynı local daemon + web mimarisini paylaşır.
 
 ### Web / Localhost (varsayılan)
 
@@ -520,7 +520,7 @@ pnpm tools-dev
 pnpm tools-dev inspect desktop status
 
 # Desktop app screenshot al
-pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
+pnpm tools-dev inspect desktop screenshot --path /tmp/open-make.png
 ```
 
 Desktop app web URL'ini sidecar IPC üzerinden otomatik bulur; port tahmini gerekmez.
@@ -537,22 +537,22 @@ Desktop app web URL'ini sidecar IPC üzerinden otomatik bulur; port tahmini gere
 
 Fixed-port restart'lar, background startup ve tam troubleshooting için [`QUICKSTART.md`](QUICKSTART.md) oku.
 
-## Open Design'ı coding agent'ından kullanma
+## Open Make'ı coding agent'ından kullanma
 
-Open Design bir stdio MCP server gönderir. Claude Code, Codex, Cursor, VS Code, Antigravity, Zed, Windsurf veya MCP uyumlu herhangi bir client'a bağla; başka repodaki agent yerel Open Design projelerinden dosyaları doğrudan okuyabilir. Export-then-attach döngüsünün yerine geçer. Agent `search_files`, `get_file` veya `get_artifact` çağırırken project argümanı vermezse MCP, Open Design'da o anda açık olan proje (ve dosya) neyse onu varsayar; *"build this in my app"* veya *"match these styles"* gibi prompt'lar doğrudan çalışır.
+Open Make bir stdio MCP server gönderir. Claude Code, Codex, Cursor, VS Code, Antigravity, Zed, Windsurf veya MCP uyumlu herhangi bir client'a bağla; başka repodaki agent yerel Open Make projelerinden dosyaları doğrudan okuyabilir. Export-then-attach döngüsünün yerine geçer. Agent `search_files`, `get_file` veya `get_artifact` çağırırken project argümanı vermezse MCP, Open Make'da o anda açık olan proje (ve dosya) neyse onu varsayar; *"build this in my app"* veya *"match these styles"* gibi prompt'lar doğrudan çalışır.
 
 **Neden MCP?** Her tasarım iterasyonunda zip export edip tekrar attach etmek akışı bozar. MCP server tasarım kaynağını — token CSS, JSX component'leri, entry HTML — agent'ın ada göre sorgulayabileceği structured API olarak açar. Agent son export'tan kalma stale copy'yi değil, her zaman canlı dosyayı görür.
 
-Client başına install flow için Open Design app içinde **Settings → MCP server** aç. Panel, `node` binary'nin absolute path'ini ve daemon'un build edilmiş `cli.js` dosyasını her snippet içine işler; böylece `od` PATH'te yokken bile taze source clone'da çalışır. Cursor one-click deeplink alır; diğerleri config dosyalarının beklediği schema'da copy-paste JSON snippet alır (Claude Code, `~/.claude.json` dosyasını elle düzenlememek için `claude mcp add-json` one-liner içerir). Server'ın görünmesi için install sonrası client'ını yeniden başlat veya reload et.
+Client başına install flow için Open Make app içinde **Settings → MCP server** aç. Panel, `node` binary'nin absolute path'ini ve daemon'un build edilmiş `cli.js` dosyasını her snippet içine işler; böylece `od` PATH'te yokken bile taze source clone'da çalışır. Cursor one-click deeplink alır; diğerleri config dosyalarının beklediği schema'da copy-paste JSON snippet alır (Claude Code, `~/.claude.json` dosyasını elle düzenlememek için `claude mcp add-json` one-liner içerir). Server'ın görünmesi için install sonrası client'ını yeniden başlat veya reload et.
 
-MCP tool call'larının başarılı olması için daemon lokal olarak çalışmalıdır. Agent Open Design'dan önce başlatıldıysa, Open Design açıldıktan sonra agent'ı yeniden başlat; canlı daemon'a ulaşabilsin. Daemon offline iken yapılan tool call'ları crash yerine net `"daemon not reachable"` hatası döndürür.
+MCP tool call'larının başarılı olması için daemon lokal olarak çalışmalıdır. Agent Open Make'dan önce başlatıldıysa, Open Make açıldıktan sonra agent'ı yeniden başlat; canlı daemon'a ulaşabilsin. Daemon offline iken yapılan tool call'ları crash yerine net `"daemon not reachable"` hatası döndürür.
 
-**Güvenlik modeli.** MCP server read-only'dir; dosya okuma, dosya metadata ve search açar; diske yazan veya harici servis çağıran bir şey yoktur. Coding agent'ın child process'i olarak stdio üzerinden çalışır, yani kaydettiğin MCP client yerel Open Design projelerine read access devralır. Bunu bir VS Code extension kurmak gibi ele al: yalnızca güvendiğin client'ları kaydet. Daemon varsayılan olarak `127.0.0.1` üzerinde bind eder; LAN'a açmak açık `OD_BIND_HOST` opt-in ister.
+**Güvenlik modeli.** MCP server read-only'dir; dosya okuma, dosya metadata ve search açar; diske yazan veya harici servis çağıran bir şey yoktur. Coding agent'ın child process'i olarak stdio üzerinden çalışır, yani kaydettiğin MCP client yerel Open Make projelerine read access devralır. Bunu bir VS Code extension kurmak gibi ele al: yalnızca güvendiğin client'ları kaydet. Daemon varsayılan olarak `127.0.0.1` üzerinde bind eder; LAN'a açmak açık `OD_BIND_HOST` opt-in ister.
 
 ## Repository structure
 
 ```text
-open-design/
+open-make/
 ├── README.md                      ← this file
 ├── README.de.md                   ← Deutsch
 ├── README.ru.md                   ← Русский
@@ -592,7 +592,7 @@ open-design/
 │
 ├── packages/
 │   ├── contracts/                 ← shared web/daemon app contracts
-│   ├── sidecar-proto/             ← Open Design sidecar protocol contract
+│   ├── sidecar-proto/             ← Open Make sidecar protocol contract
 │   ├── sidecar/                   ← generic sidecar runtime primitives
 │   └── platform/                  ← generic process/platform primitives
 │
@@ -696,7 +696,7 @@ Gerçek render edilmiş MP4'ü oynatmak için herhangi bir thumbnail'e tıkla. T
 
 ### HyperFrames — HTML→MP4 motion graphics (11 yeniden üretilebilir template)
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes), HeyGen'in açık kaynak agent-native video framework'üdür: sen (veya agent) HTML + CSS + GSAP yazarsın, HyperFrames headless Chrome + FFmpeg ile deterministik MP4 render eder. Open Design, HyperFrames'i daemon dispatch'e bağlı birinci sınıf video modeli (`hyperframes-html`) olarak gönderir; ayrıca agent'a timeline contract, scene-transition kuralları, audio-reactive pattern'ler, captions/TTS ve catalog block'ları (`npx hyperframes add <slug>`) öğreten `skills/hyperframes/` skill'i vardır.
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes), HeyGen'in açık kaynak agent-native video framework'üdür: sen (veya agent) HTML + CSS + GSAP yazarsın, HyperFrames headless Chrome + FFmpeg ile deterministik MP4 render eder. Open Make, HyperFrames'i daemon dispatch'e bağlı birinci sınıf video modeli (`hyperframes-html`) olarak gönderir; ayrıca agent'a timeline contract, scene-transition kuralları, audio-reactive pattern'ler, captions/TTS ve catalog block'ları (`npx hyperframes add <slug>`) öğreten `skills/hyperframes/` skill'i vardır.
 
 On bir hyperframes prompt'u [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/) altında gelir; her biri belirli bir archetype üreten somut brief'tir:
 
@@ -734,7 +734,7 @@ Chat / artefakt döngüsü spot ışığını alır, ama OD'yi başka şeylerle 
 - **Kullanıcı kayıtlı template'leri.** Render'ı beğenince `POST /api/templates` HTML + metadata'yı SQLite `templates` tablosuna snapshot'lar. Sonraki proje picker'daki "your templates" satırından onu seçer; gönderilen 31 ile aynı yüzey, ama senin.
 - **Tab persistence.** Her proje açık dosyalarını ve aktif tab'ını `tabs` tablosunda hatırlar. Yarın projeyi tekrar aç, workspace bıraktığın gibi görünür.
 - **Artifact lint API.** `POST /api/artifacts/lint`, üretilmiş artefakt üzerinde structural check'ler çalıştırır (bozuk `<artifact>` framing, eksik required side file'lar, stale palette token'ları) ve agent'ın sonraki turda okuyabileceği finding'ler döndürür. Beş boyutlu self-critique, skorunu vibe'a değil gerçek kanıta bağlamak için bunu kullanır.
-- **Sidecar protocol + desktop automation.** Daemon, web ve desktop process'leri typed five-field stamp taşır (`app · mode · namespace · ipc · source`) ve `/tmp/open-design/ipc/<namespace>/<app>.sock` üzerinde JSON-RPC IPC kanalı açar. `tools-dev inspect desktop status \| eval \| screenshot` bu kanalı sürer; böylece headless E2E, özel harness olmadan gerçek Electron shell'e karşı çalışır ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
+- **Sidecar protocol + desktop automation.** Daemon, web ve desktop process'leri typed five-field stamp taşır (`app · mode · namespace · ipc · source`) ve `/tmp/open-make/ipc/<namespace>/<app>.sock` üzerinde JSON-RPC IPC kanalı açar. `tools-dev inspect desktop status \| eval \| screenshot` bu kanalı sürer; böylece headless E2E, özel harness olmadan gerçek Electron shell'e karşı çalışır ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
 - **Windows dostu spawn.** Uzun composed prompt'larda `CreateProcess`'in ~32 KB argv limitini patlatabilecek her adapter (Codex, Gemini, OpenCode, Cursor Agent, Qwen, Qoder CLI, Pi) prompt'u stdin üzerinden verir. Claude Code ve Copilot `-p` tutar; daemon o bile taşarsa temp prompt-file'a düşer.
 - **Namespace başına runtime data.** `OD_DATA_DIR` ve `--namespace`, tamamen izole `.od/` tarzı ağaçlar sağlar; Playwright, beta channel'lar ve gerçek projelerin aynı SQLite dosyasını asla paylaşmaz.
 
@@ -751,7 +751,7 @@ Aşağıdaki tüm mekanizma, [`huashu-design`](https://github.com/alchaincyf/hua
 
 ## Karşılaştırma
 
-| Eksen | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Design** |
+| Eksen | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Make** |
 |---|---|---|---|
 | Lisans | Kapalı | MIT | **Apache-2.0** |
 | Form faktörü | Web (claude.ai) | Desktop (Electron) | **Web app + local daemon** |
@@ -856,7 +856,7 @@ Release note'lar, yeni skill'ler, yeni design system'ler ve arada sırada sırad
 ## Star ver
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="GitHub'da Open Design'a star ver — github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="GitHub'da Open Make'a star ver — github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 Bu sana otuz dakika kazandırdıysa bir ★ ver. Star'lar kira ödemiyor, ama sonraki tasarımcıya, agent'a ve contributor'a bu deneyin dikkat etmeye değer olduğunu gösteriyor. Tek tık, üç saniye, gerçek sinyal: [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design).
@@ -873,10 +873,10 @@ Tam walkthrough, merge çıtası, code style ve kabul etmediklerimiz → [`CONTR
 
 ## Contributors
 
-Open Design'ı kod, doküman, feedback, yeni skill, yeni design system veya keskin bir issue ile ileri taşıyan herkese teşekkürler. Her gerçek katkı önemlidir; aşağıdaki wall bunu yüksek sesle söylemenin en kolay yolu.
+Open Make'ı kod, doküman, feedback, yeni skill, yeni design system veya keskin bir issue ile ileri taşıyan herkese teşekkürler. Her gerçek katkı önemlidir; aşağıdaki wall bunu yüksek sesle söylemenin en kolay yolu.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Design contributors" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Make contributors" />
 </a>
 
 İlk PR'ını gönderdiysen hoş geldin. [`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) label'ı giriş noktasıdır.
@@ -884,7 +884,7 @@ Open Design'ı kod, doküman, feedback, yeni skill, yeni design system veya kesk
 ## Repository activity
 
 <picture>
-  <img alt="Open Design — repository metrics" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Make — repository metrics" src="docs/assets/github-metrics.svg" />
 </picture>
 
 Yukarıdaki SVG [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) tarafından [`lowlighter/metrics`](https://github.com/lowlighter/metrics) kullanılarak günlük yenilenir. Daha erken istiyorsan **Actions** tab'inden manuel refresh tetikle; daha zengin plugin'ler (traffic, follow-up time) için fine-grained PAT ile `METRICS_TOKEN` repository secret ekle.
@@ -895,7 +895,7 @@ Yukarıdaki SVG [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml)
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-09" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
-    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
+    <img alt="Open Make star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
   </picture>
 </a>
 

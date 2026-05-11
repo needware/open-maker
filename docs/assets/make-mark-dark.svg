@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="make">
+  <title>make (dark)</title>
+  <!-- Dark-mode variant: structural backbone flips from ink to cream
+       so the mark holds contrast on near-black surfaces (terminal
+       splash, dark dashboard chrome, README dark themes). The
+       warm-rust accent stays  it's the brand's constant. -->
+  <rect x="26" y="6" width="12" height="52" rx="1.6" fill="#fbeee5"/>
+  <rect x="6" y="26" width="52" height="12" rx="1.6" fill="#c96442"/>
+</svg>

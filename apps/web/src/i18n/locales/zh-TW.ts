@@ -39,7 +39,7 @@ export const zhTW: Dict = {
   'common.daysShort': '{n}天',
   'common.untitled': '未命名',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': '研究預覽版',
   'app.brandSubtitle': '由 Nexu Labs 出品',
   'app.welcomeLoading': '正在載入工作區…',

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" fill="none" role="img" aria-label="make">
+  <title>make</title>
+  <!-- Horizontal lockup: + mark on the left, lowercase serif wordmark
+       on the right. Font stack falls back through editorial system
+       serifs so the wordmark renders consistently across browsers /
+       GitHub README / Figma without shipping a webfont. Swap in a
+       licensed display face (GT Sectra, Tiempos Headline, &) once
+       the brand is finalized. -->
+  <g transform="translate(0,0)">
+    <rect x="26" y="6" width="12" height="52" rx="1.6" fill="#1a1916"/>
+    <rect x="6" y="26" width="52" height="12" rx="1.6" fill="#c96442"/>
+  </g>
+  <text x="80" y="46"
+        font-family="'GT Sectra', 'Tiempos Headline', 'Caslon', Georgia, 'Times New Roman', serif"
+        font-size="40" font-weight="500" fill="#1a1916"
+        letter-spacing="-1.2">make</text>
+</svg>

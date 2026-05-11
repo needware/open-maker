@@ -72,6 +72,7 @@ import type {
   PreviewCommentTarget,
   ProjectFile,
   ProjectTemplate,
+  PromptTemplateSummary,
   LiveArtifactEventItem,
   LiveArtifactSummary,
   SkillSummary,
@@ -85,9 +86,14 @@ import {
 import { AppChromeHeader } from './AppChromeHeader';
 import { AvatarMenu } from './AvatarMenu';
 import { ChatPane } from './ChatPane';
+import type { ChatComposerHandle } from './ChatComposer';
 import { decideAutoOpenAfterWrite } from './auto-open-file';
+import { PENDING_EXAMPLE_KEY } from './EntryView';
+import { mergeFacetMetadata, type FacetSelection } from './FacetParametersPanel';
+import { FACET_MODES, type FacetMode } from './FacetSetupPopover';
 import { FileWorkspace } from './FileWorkspace';
 import { CenteredLoader } from './Loading';
+import { WorkspaceFacetHero } from './WorkspaceFacetHero';
 
 interface Props {
   project: Project;
@@ -96,6 +102,13 @@ interface Props {
   agents: AgentInfo[];
   skills: SkillSummary[];
   designSystems: DesignSystemSummary[];
+  // Catalog data the FacetSetupPopover needs. Threaded down from App
+  // so the popover can render the full pre-RFC NewProjectPanel form
+  // (templates, prompt templates, media providers) without each level
+  // refetching.
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  defaultDesignSystemId?: string | null;
   daemonLive: boolean;
   onModeChange: (mode: AppConfig['mode']) => void;
   onAgentChange: (id: string) => void;
@@ -220,6 +233,9 @@ export function ProjectView({
   agents,
   skills,
   designSystems,
+  templates = [],
+  promptTemplates = [],
+  defaultDesignSystemId = null,
   daemonLive,
   onModeChange,
   onAgentChange,
@@ -1589,6 +1605,89 @@ export function ProjectView({
     [project, onProjectChange],
   );
 
+  // The composer's FacetModeChip + WorkspaceFacetHero need a handle to
+  // refocus the textarea after the user picks a mode card. Defined here
+  // so both surfaces share one source of truth.
+  const composerHandleRef = useRef<ChatComposerHandle | null>(null);
+
+  // Derive the chip's "current mode" from the persisted skillId. When
+  // there's no skill chosen yet (fresh project), default to 'prototype'
+  // — the most common starting point and the leftmost tab in the
+  // popover. Users can pick a different mode from the chip or hero.
+  const facetMode: FacetMode = useMemo(() => {
+    const skill = skills.find((s) => s.id === project.skillId);
+    if (skill && FACET_MODES.includes(skill.mode)) return skill.mode;
+    return 'prototype';
+  }, [skills, project.skillId]);
+
+  const handleFacetChange = useCallback(
+    (next: FacetSelection) => {
+      // Carry forward system-owned metadata fields the panel does not
+      // touch (baseDir, importedFrom, linkedDirs, …) while letting the
+      // panel fully replace its own slice of fields. A naïve shallow
+      // spread leaks panel-owned fields across tabs — switching from
+      // the Live artifact tab to the Video tab would otherwise keep
+      // `intent: 'live-artifact'` around and the FacetModeChip would
+      // keep reading "Live artifact" instead of "Video".
+      const mergedMetadata = mergeFacetMetadata(project.metadata, next.metadata);
+      const updated: Project = {
+        ...project,
+        skillId: next.skillId,
+        designSystemId: next.designSystemId,
+        metadata: mergedMetadata,
+        updatedAt: Date.now(),
+      };
+      onProjectChange(updated);
+      void patchProject(project.id, {
+        skillId: next.skillId,
+        designSystemId: next.designSystemId,
+        metadata: mergedMetadata,
+      });
+    },
+    [project, onProjectChange],
+  );
+
+  // Hero card click: pick the most "default" skill in the chosen mode,
+  // commit it, then refocus the composer so the user can immediately
+  // type a brief. Builds a minimal `FacetSelection` so the persisted
+  // metadata stays consistent with what the popover would write.
+  const handleHeroPickMode = useCallback(
+    (mode: FacetMode) => {
+      const candidates = skills
+        .filter((s) => s.mode === mode && !s.aggregatesExamples)
+        .sort((a, b) => (b.featured ?? 0) - (a.featured ?? 0));
+      const chosen =
+        candidates.find((s) => (s.defaultFor ?? []).includes('fast-create')) ??
+        candidates[0];
+      if (!chosen) return;
+      const designSystemId = chosen.designSystemRequired
+        ? (project.designSystemId ?? designSystems[0]?.id ?? null)
+        : null;
+      handleFacetChange({
+        skillId: chosen.id,
+        designSystemId,
+        // 'design-system' isn't a ProjectKind; fold to 'other'.
+        metadata: { kind: chosen.mode === 'design-system' ? 'other' : chosen.mode },
+      });
+      // Defer focus past React's commit so the chip rerender doesn't
+      // steal it. requestAnimationFrame is enough; setTimeout(0) also
+      // works but is slightly less reliable across browsers.
+      requestAnimationFrame(() => composerHandleRef.current?.focus());
+    },
+    [skills, designSystems, project.designSystemId, handleFacetChange],
+  );
+
+  // The hero replaces FileWorkspace when the project genuinely has no
+  // creative output yet: no rendered artifacts, no live artifacts, no
+  // user messages on record. Once any of those exist we defer to the
+  // workspace's own empty / file states (which already handle their
+  // own teaching messages).
+  const showFacetHero = useMemo(() => {
+    if (projectFiles.length > 0) return false;
+    if (liveArtifacts.length > 0) return false;
+    return !messages.some((m) => m.role === 'user');
+  }, [projectFiles.length, liveArtifacts.length, messages]);
+
   const projectMeta = useMemo(() => {
     const skill = skills.find((s) => s.id === project.skillId)?.name;
     const ds = designSystems.find((d) => d.id === project.designSystemId)?.title;
@@ -1789,6 +1888,63 @@ export function ProjectView({
     if (project.pendingPrompt) onClearPendingPrompt();
   }, [project.pendingPrompt, onClearPendingPrompt]);
 
+  // Pending-example handoff from EntryView's Examples tab. Stashed in
+  // sessionStorage when the user clicks "Use this prompt" *before* a
+  // project exists. We consume it the first time a project mounts —
+  // applying the chosen skill and seeding the composer with the example
+  // prompt — then clear the entry so subsequent project switches don't
+  // replay it. Lives here (not in App.tsx) because we need the project's
+  // local skillId/designSystemId state and composer ref to be wired up
+  // first; running this on App mount would race those.
+  useEffect(() => {
+    let raw: string | null = null;
+    try {
+      raw = window.sessionStorage.getItem(PENDING_EXAMPLE_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let parsed: { skillId?: string; prompt?: string } | null = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      window.sessionStorage.removeItem(PENDING_EXAMPLE_KEY);
+      return;
+    }
+    if (!parsed?.skillId) {
+      window.sessionStorage.removeItem(PENDING_EXAMPLE_KEY);
+      return;
+    }
+    const skill = skills.find((s) => s.id === parsed!.skillId);
+    if (!skill) {
+      // Skill list might still be loading; bail without consuming so
+      // the next render can retry. Skills are small and load fast in
+      // practice; if they truly never arrive we just leave the stash
+      // for next session.
+      return;
+    }
+    const designSystemId = skill.designSystemRequired
+      ? (project.designSystemId ?? designSystems[0]?.id ?? null)
+      : null;
+    handleFacetChange({
+      skillId: skill.id,
+      designSystemId,
+      // 'design-system' isn't a ProjectKind; fold it into 'other' so
+      // the metadata typechecks. The skill's mode survives as
+      // skill.mode on the registry side.
+      metadata: { kind: skill.mode === 'design-system' ? 'other' : skill.mode },
+    });
+    if (parsed.prompt) {
+      setInitialDraft(parsed.prompt);
+    }
+    window.sessionStorage.removeItem(PENDING_EXAMPLE_KEY);
+    requestAnimationFrame(() => composerHandleRef.current?.focus());
+    // We intentionally only re-run when `skills` or `designSystems`
+    // arrive (or change), since they're the only inputs that can
+    // unblock a successful consumption.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skills, designSystems]);
+
   return (
     <div className="app">
       <AppChromeHeader
@@ -1887,6 +2043,19 @@ export function ProjectView({
                 onProjectChange({ ...project, metadata });
               }}
               onCollapse={() => setWorkspaceFocused(true)}
+              facetMode={facetMode}
+              facetSkillId={project.skillId ?? null}
+              facetDesignSystemId={project.designSystemId ?? null}
+              facetMetadata={project.metadata}
+              skills={skills}
+              designSystems={designSystems}
+              defaultDesignSystemId={defaultDesignSystemId}
+              templates={templates}
+              promptTemplates={promptTemplates}
+              mediaProviders={config.mediaProviders}
+              onOpenConnectorsTab={onOpenSettings}
+              onFacetChange={handleFacetChange}
+              composerHandleRef={composerHandleRef}
             />
           ) : (
             <div className="pane" data-testid="chat-pane-loading">
@@ -1910,27 +2079,37 @@ export function ProjectView({
             onBlur={handleChatResizeBlur}
           />
         ) : null}
-        <FileWorkspace
-          projectId={project.id}
-          files={projectFiles}
-          liveArtifacts={liveArtifacts}
-          onRefreshFiles={() => {
-            void refreshWorkspaceItems();
-          }}
-          isDeck={isDeck}
-          onExportAsPptx={handleExportAsPptx}
-          streaming={streaming}
-          openRequest={openRequest}
-          liveArtifactEvents={liveArtifactEvents}
-          tabsState={openTabsState}
-          onTabsStateChange={persistTabsState}
-          previewComments={previewComments}
-          onSavePreviewComment={savePreviewComment}
-          onRemovePreviewComment={removePreviewComment}
-          onSendBoardCommentAttachments={handleSendBoardCommentAttachments}
-          focusMode={workspaceFocused}
-          onFocusModeChange={setWorkspaceFocused}
-        />
+        {showFacetHero ? (
+          <div className="pane" data-testid="workspace-empty-pane" style={{ display: 'flex', flexDirection: 'column' }}>
+            <WorkspaceFacetHero
+              projectName={project.name}
+              skills={skills}
+              onPickMode={handleHeroPickMode}
+            />
+          </div>
+        ) : (
+          <FileWorkspace
+            projectId={project.id}
+            files={projectFiles}
+            liveArtifacts={liveArtifacts}
+            onRefreshFiles={() => {
+              void refreshWorkspaceItems();
+            }}
+            isDeck={isDeck}
+            onExportAsPptx={handleExportAsPptx}
+            streaming={streaming}
+            openRequest={openRequest}
+            liveArtifactEvents={liveArtifactEvents}
+            tabsState={openTabsState}
+            onTabsStateChange={persistTabsState}
+            previewComments={previewComments}
+            onSavePreviewComment={savePreviewComment}
+            onRemovePreviewComment={removePreviewComment}
+            onSendBoardCommentAttachments={handleSendBoardCommentAttachments}
+            focusMode={workspaceFocused}
+            onFocusModeChange={setWorkspaceFocused}
+          />
+        )}
       </div>
     </div>
   );

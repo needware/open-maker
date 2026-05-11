@@ -39,7 +39,7 @@ export const esES: Dict = {
   'common.daysShort': '{n} d',
   'common.untitled': 'Sin título',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'Vista previa de investigación',
   'app.brandSubtitle': 'por Nexu Labs',
   'app.welcomeLoading': 'Cargando espacio de trabajo…',

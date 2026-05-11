@@ -30,7 +30,7 @@
 // real OS paths, which is what the project-as-unit model demands.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { listDir, type FsLsEntry } from '../state/projects';
+import { listDir, type FsLsEntry, type FsLsOutcome } from '../state/projects';
 import { Icon } from './Icon';
 
 interface Props {
@@ -54,19 +54,59 @@ export function FolderPickerDialog({ open, initialPath, onOpen, onClose }: Props
   const [showHidden, setShowHidden] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track the last attempted target so the Retry button knows what to
+  // re-issue, and the error banner can show what we actually tried.
+  // `null` means "daemon's home dir" (the no-arg call).
+  const [lastAttempt, setLastAttempt] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
+  function describeOutcomeError(outcome: Exclude<FsLsOutcome, { kind: 'ok' }>, target: string | null): string {
+    const where = target ? ` (${target})` : '';
+    if (outcome.kind === 'transport-error') {
+      return `Could not reach the daemon. Is it still running?${where}`;
+    }
+    // http-error — daemon answered with a structured failure. Render
+    // the actual code/message so the user can act on it instead of
+    // being told the daemon is "still running" when it clearly is.
+    if (outcome.code === 'FS_NOT_FOUND') {
+      return `Folder not found${where}.`;
+    }
+    if (outcome.code === 'FS_NOT_DIR') {
+      return `Not a folder${where}.`;
+    }
+    if (outcome.code) {
+      return `${outcome.code}${where}: ${outcome.message}`;
+    }
+    return `Folder listing failed${where}: ${outcome.message}`;
+  }
+
   async function navigate(target?: string) {
+    const requested = target ?? null;
     setLoading(true);
     setError(null);
-    const result = await listDir(target, { showHidden });
+    setLastAttempt(requested);
+    let outcome = await listDir(target, { showHidden });
+    // Self-recovery: when the very first call fails because the
+    // requested path no longer exists (e.g. `recentHomeDir` points at a
+    // moved/deleted folder, or an unmounted external drive), fall back
+    // to the daemon's home dir transparently. This rescues the picker
+    // from getting stuck on a stale launch state — much better than
+    // forcing the user to close + reopen the dialog.
+    if (
+      outcome.kind === 'http-error' &&
+      outcome.code === 'FS_NOT_FOUND' &&
+      requested !== null
+    ) {
+      outcome = await listDir(undefined, { showHidden });
+    }
     setLoading(false);
-    if (!result) {
-      setError('Could not reach the daemon. Is it still running?');
+    if (outcome.kind !== 'ok') {
+      setError(describeOutcomeError(outcome, requested));
       return;
     }
+    const { result } = outcome;
     setCwd(result.path);
     setParent(result.parent);
     setHome(result.home);
@@ -74,6 +114,14 @@ export function FolderPickerDialog({ open, initialPath, onOpen, onClose }: Props
     if (result.error) {
       setError(`Cannot read folder: ${result.error.code}. Try a different one.`);
     }
+  }
+
+  function retryLastAttempt() {
+    void navigate(lastAttempt ?? undefined);
+  }
+
+  function navigateToHome() {
+    void navigate(undefined);
   }
 
   // Initial load when the dialog opens. Resetting state on each open
@@ -85,6 +133,7 @@ export function FolderPickerDialog({ open, initialPath, onOpen, onClose }: Props
     setEntries([]);
     setCwd('');
     setParent(null);
+    setLastAttempt(null);
     void navigate(initialPath);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialPath]);
@@ -232,7 +281,9 @@ export function FolderPickerDialog({ open, initialPath, onOpen, onClose }: Props
             }}
             title={cwd}
           >
-            {loading && !cwd ? 'Loading…' : breadcrumb || '/'}
+            {loading && !cwd
+              ? 'Loading…'
+              : breadcrumb || (cwd ? '/' : error ? '—' : 'Loading…')}
           </span>
           <label
             style={{
@@ -267,12 +318,37 @@ export function FolderPickerDialog({ open, initialPath, onOpen, onClose }: Props
               role="alert"
               data-testid="folder-picker-error"
               style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
                 padding: '10px 12px',
                 fontSize: 12,
                 color: '#b00020',
               }}
             >
-              {error}
+              <span>{error}</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={retryLastAttempt}
+                  disabled={loading}
+                  data-testid="folder-picker-retry"
+                  style={{ ...btnStyle, fontSize: 12, padding: '4px 10px' }}
+                >
+                  Retry
+                </button>
+                {lastAttempt !== null ? (
+                  <button
+                    type="button"
+                    onClick={navigateToHome}
+                    disabled={loading}
+                    data-testid="folder-picker-go-home"
+                    style={{ ...btnStyle, fontSize: 12, padding: '4px 10px' }}
+                  >
+                    Go to home
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 

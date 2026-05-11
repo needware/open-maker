@@ -1,11 +1,11 @@
 <div dir="rtl">
 
-# Open Design
+# Open Make
 
 > **البديل مفتوح المصدر لـ [Claude Design][cd].** يعمل محلياً أولاً، قابل للنشر على Vercel، ويدعم BYOK في كل طبقة — **16 أداة CLI لوكلاء البرمجة** يكتشفها تلقائياً من `PATH` (Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI) لتصبح هي محرّك التصميم، مدفوعةً بـ **31 Skill قابلة للتركيب** و**72 نظام تصميم بمستوى الهوية البصرية**. لا توجد لديك CLI؟ بروكسي BYOK متوافق مع OpenAI يقدّم نفس الحلقة بدون عملية الـ spawn.
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Design — غلاف افتتاحي: صمّم مع الوكيل على حاسوبك المحمول" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Make — غلاف افتتاحي: صمّم مع الوكيل على حاسوبك المحمول" width="100%" />
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@
 
 أظهر [Claude Design][cd] من Anthropic (الذي صدر في 2026-04-17 مبنياً على Opus 4.7) ما يحدث حين يتوقّف الـ LLM عن كتابة النصوص ويبدأ بتسليم منتجات تصميم فعلية. انتشر بسرعة — وبقي **مغلق المصدر**، مدفوعاً، يعمل في السحابة فقط، ومرتبطاً بنماذج Anthropic ومهاراتها الداخلية. لا checkout، لا استضافة ذاتية، لا نشر على Vercel، ولا إمكانية لاستبدال الوكيل.
 
-**Open Design (OD) هو البديل مفتوح المصدر.** نفس الحلقة، نفس النموذج الذهني المتمحور حول الـ artifact، بدون أيّ قيود. نحن لا نشحن وكيلاً — أقوى وكلاء البرمجة موجودون أصلاً على حاسوبك. ما نقدّمه هو ربطهم بسير عمل تصميمي مدفوع بالـ Skills يعمل محلياً عبر `pnpm tools-dev`، يمكن نشر طبقة الويب منه على Vercel، ويبقى BYOK في كل طبقة.
+**Open Make (OD) هو البديل مفتوح المصدر.** نفس الحلقة، نفس النموذج الذهني المتمحور حول الـ artifact، بدون أيّ قيود. نحن لا نشحن وكيلاً — أقوى وكلاء البرمجة موجودون أصلاً على حاسوبك. ما نقدّمه هو ربطهم بسير عمل تصميمي مدفوع بالـ Skills يعمل محلياً عبر `pnpm tools-dev`، يمكن نشر طبقة الويب منه على Vercel، ويبقى BYOK في كل طبقة.
 
 اكتب `اصنع لي pitch deck بأسلوب مجلّة لجولة seed`. ينبثق نموذج الأسئلة التفاعلي قبل أن يرتجل النموذج بكسلاً واحداً. يختار الوكيل أحد خمسة اتجاهات بصرية منتقاة. تنساب خطّة `TodoWrite` حيّة إلى الواجهة. يبني الـ daemon مجلد مشروع حقيقياً على القرص يحوي قالب seed، مكتبة layouts، و checklist للفحص الذاتي. يقرأها الوكيل — pre-flight إلزامي — ثم يجري تقييماً ذاتياً خماسي الأبعاد على ناتجه، ويُصدر `<artifact>` واحداً يُعرض في iframe معزول خلال ثوانٍ.
 
@@ -277,7 +277,7 @@ DISCOVERY directives  (turn-1 form, turn-2 brand branch, TodoWrite, 5-dim critiq
    │  /api/upload          /api/projects/:id/files…
    │  /artifacts (static)  /frames (static)
    │
-   │  optional: sidecar IPC at /tmp/open-design/ipc/<ns>/<app>.sock
+   │  optional: sidecar IPC at /tmp/open-make/ipc/<ns>/<app>.sock
    │  (STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN)
    └─────────┬────────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -305,7 +305,7 @@ DISCOVERY directives  (turn-1 form, turn-2 brand branch, TodoWrite, 5-dim critiq
 
 ### تنزيل تطبيق سطح المكتب (بدون بناء)
 
-أسرع طريقة لتجربة Open Design هي تطبيق سطح المكتب الجاهز — بدون Node، بدون pnpm، بدون clone:
+أسرع طريقة لتجربة Open Make هي تطبيق سطح المكتب الجاهز — بدون Node، بدون pnpm، بدون clone:
 
 - **[open-design.ai](https://open-design.ai/)** — صفحة التنزيل الرسمية
 - **[إصدارات GitHub](https://github.com/nexu-io/open-design/releases)**
@@ -314,7 +314,7 @@ DISCOVERY directives  (turn-1 form, turn-2 brand branch, TodoWrite, 5-dim critiq
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-design
+cd open-make
 corepack enable
 corepack pnpm --version   # should print 10.33.2
 pnpm install
@@ -356,7 +356,7 @@ pnpm tools-dev run web
 
 ## تشغيل المشروع
 
-يمكن تشغيل Open Design كتطبيق ويب في متصفّحك، أو كتطبيق سطح مكتب Electron. كلا الوضعين يتشاركان نفس معمارية الـ daemon المحلي + الويب.
+يمكن تشغيل Open Make كتطبيق ويب في متصفّحك، أو كتطبيق سطح مكتب Electron. كلا الوضعين يتشاركان نفس معمارية الـ daemon المحلي + الويب.
 
 ### الويب / Localhost (الافتراضي)
 
@@ -393,7 +393,7 @@ pnpm tools-dev
 pnpm tools-dev inspect desktop status
 
 # Take a screenshot of the desktop app
-pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
+pnpm tools-dev inspect desktop screenshot --path /tmp/open-make.png
 ```
 
 تطبيق سطح المكتب يكتشف رابط الويب تلقائياً عبر sidecar IPC — لا حاجة لتخمين المنافذ.
@@ -410,22 +410,22 @@ pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
 
 لإعادة التشغيل بمنافذ ثابتة، الإقلاع في الخلفية، واستكشاف الأخطاء الكامل، راجع [`QUICKSTART.md`](QUICKSTART.md).
 
-## استخدام Open Design من وكيل البرمجة لديك
+## استخدام Open Make من وكيل البرمجة لديك
 
-يشحن Open Design خادم MCP عبر stdio. اربطه بـ Claude Code أو Codex أو Cursor أو VS Code أو Antigravity أو Zed أو Windsurf أو أيّ عميل متوافق مع MCP، وسيتمكّن الوكيل في مستودع آخر من قراءة الملفات من مشاريع Open Design المحلية مباشرة. يحلّ هذا محلّ حلقة export-ثم-attach. حين يستدعي الوكيل `search_files` أو `get_file` أو `get_artifact` بدون وسيط مشروع، يأخذ MCP افتراضياً المشروع (والملف) المفتوح حالياً في Open Design، بحيث تعمل برومبتات مثل *«ابنِ هذا في تطبيقي»* أو *«طابِق هذه الأنماط»* مباشرة.
+يشحن Open Make خادم MCP عبر stdio. اربطه بـ Claude Code أو Codex أو Cursor أو VS Code أو Antigravity أو Zed أو Windsurf أو أيّ عميل متوافق مع MCP، وسيتمكّن الوكيل في مستودع آخر من قراءة الملفات من مشاريع Open Make المحلية مباشرة. يحلّ هذا محلّ حلقة export-ثم-attach. حين يستدعي الوكيل `search_files` أو `get_file` أو `get_artifact` بدون وسيط مشروع، يأخذ MCP افتراضياً المشروع (والملف) المفتوح حالياً في Open Make، بحيث تعمل برومبتات مثل *«ابنِ هذا في تطبيقي»* أو *«طابِق هذه الأنماط»* مباشرة.
 
 **لماذا MCP؟** تصدير zip وإعادة إرفاقه مع كل دورة تصميم يكسر التدفّق. خادم MCP يكشف مصدر تصميمك مباشرة — tokens CSS، مكوّنات JSX، entry HTML — كـ API منظَّم يمكن للوكيل الاستعلام منه بالاسم. الوكيل يرى دائماً الملف الحيّ، لا نسخة قديمة من آخر export.
 
-افتح **Settings → MCP server** في تطبيق Open Design للحصول على تدفّق تثبيت لكلّ عميل. تُضمِّن اللوحة المسار المطلق لـ `node` ولـ `cli.js` المبني للـ daemon داخل كل snippet، فتعمل على نسخة source جديدة لا يكون فيها `od` على الـ PATH. Cursor يحصل على deeplink بنقرة واحدة؛ والباقي يحصلون على JSON snippet للنسخ واللصق بالشكل الذي يتوقّعه ملفّ تكوينهم (Claude Code يتضمّن سطر `claude mcp add-json` واحداً، فلا تحتاج لتحرير `~/.claude.json` يدوياً). أعد تشغيل أو reload لعميلك بعد التثبيت ليظهر الخادم.
+افتح **Settings → MCP server** في تطبيق Open Make للحصول على تدفّق تثبيت لكلّ عميل. تُضمِّن اللوحة المسار المطلق لـ `node` ولـ `cli.js` المبني للـ daemon داخل كل snippet، فتعمل على نسخة source جديدة لا يكون فيها `od` على الـ PATH. Cursor يحصل على deeplink بنقرة واحدة؛ والباقي يحصلون على JSON snippet للنسخ واللصق بالشكل الذي يتوقّعه ملفّ تكوينهم (Claude Code يتضمّن سطر `claude mcp add-json` واحداً، فلا تحتاج لتحرير `~/.claude.json` يدوياً). أعد تشغيل أو reload لعميلك بعد التثبيت ليظهر الخادم.
 
-يجب أن يكون الـ daemon يعمل محلياً لتنجح استدعاءات أدوات MCP. إن كان الوكيل قد أُقلع قبل Open Design، أعد تشغيل الوكيل بعد جاهزية Open Design ليصل إلى الـ daemon الحيّ. الاستدعاءات أثناء توقّف الـ daemon تعيد خطأً واضحاً `"daemon not reachable"` بدلاً من crash.
+يجب أن يكون الـ daemon يعمل محلياً لتنجح استدعاءات أدوات MCP. إن كان الوكيل قد أُقلع قبل Open Make، أعد تشغيل الوكيل بعد جاهزية Open Make ليصل إلى الـ daemon الحيّ. الاستدعاءات أثناء توقّف الـ daemon تعيد خطأً واضحاً `"daemon not reachable"` بدلاً من crash.
 
-**نموذج الأمان.** خادم MCP للقراءة فقط؛ يكشف قراءة ملفات، metadata، وبحث — لا شيء يكتب على القرص أو يستدعي خدمة خارجية. يعمل كعملية ابن لوكيل البرمجة عبر stdio، لذا أيّ عميل MCP تسجّله يرث صلاحية قراءة لمشاريع Open Design المحلية لديك. عامله مثل تثبيت إضافة VS Code: لا تسجّل إلا العملاء الذين تثق بهم. الـ daemon يربط نفسه بـ `127.0.0.1` افتراضياً؛ التعرّض للشبكة المحلية بأكملها يتطلّب `OD_BIND_HOST` صريحاً.
+**نموذج الأمان.** خادم MCP للقراءة فقط؛ يكشف قراءة ملفات، metadata، وبحث — لا شيء يكتب على القرص أو يستدعي خدمة خارجية. يعمل كعملية ابن لوكيل البرمجة عبر stdio، لذا أيّ عميل MCP تسجّله يرث صلاحية قراءة لمشاريع Open Make المحلية لديك. عامله مثل تثبيت إضافة VS Code: لا تسجّل إلا العملاء الذين تثق بهم. الـ daemon يربط نفسه بـ `127.0.0.1` افتراضياً؛ التعرّض للشبكة المحلية بأكملها يتطلّب `OD_BIND_HOST` صريحاً.
 
 ## بنية المستودع
 
 ```
-open-design/
+open-make/
 ├── README.md                      ← English
 ├── README.ar.md                   ← العربية (this file)
 ├── README.de.md                   ← Deutsch
@@ -465,7 +465,7 @@ open-design/
 │
 ├── packages/
 │   ├── contracts/                 ← shared web/daemon app contracts
-│   ├── sidecar-proto/             ← Open Design sidecar protocol contract
+│   ├── sidecar-proto/             ← Open Make sidecar protocol contract
 │   ├── sidecar/                   ← generic sidecar runtime primitives
 │   └── platform/                  ← generic process/platform primitives
 │
@@ -613,7 +613,7 @@ OD لا يقف عند الكود. نفس واجهة الـ chat التي تنت�
 
 ### HyperFrames — HTML→MP4 motion graphics (11 قالباً جاهزاً للاستنساخ)
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) هو إطار فيديو agent-native مفتوح المصدر من HeyGen — تكتب أنت (أو الوكيل) HTML + CSS + GSAP، فيرنده HyperFrames إلى MP4 حتمي عبر headless Chrome + FFmpeg. يشحن Open Design لـ HyperFrames كنموذج فيديو من الدرجة الأولى (`hyperframes-html`) موصول في dispatch الـ daemon، إضافة إلى `skills/hyperframes/` التي تعلّم الوكيل عقد timeline، قواعد الانتقال بين المشاهد، أنماط audio-reactive، captions/TTS، وكتل الكتالوج (`npx hyperframes add <slug>`).
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) هو إطار فيديو agent-native مفتوح المصدر من HeyGen — تكتب أنت (أو الوكيل) HTML + CSS + GSAP، فيرنده HyperFrames إلى MP4 حتمي عبر headless Chrome + FFmpeg. يشحن Open Make لـ HyperFrames كنموذج فيديو من الدرجة الأولى (`hyperframes-html`) موصول في dispatch الـ daemon، إضافة إلى `skills/hyperframes/` التي تعلّم الوكيل عقد timeline، قواعد الانتقال بين المشاهد، أنماط audio-reactive، captions/TTS، وكتل الكتالوج (`npx hyperframes add <slug>`).
 
 11 برومبت hyperframes تُشحن تحت [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/)، كل واحد brief محدّد ينتج archetype بعينه:
 
@@ -651,7 +651,7 @@ OD لا يقف عند الكود. نفس واجهة الـ chat التي تنت�
 - **قوالب يحفظها المستخدم.** ما إن يعجبك رندر، يلتقط `POST /api/templates` HTML + metadata في جدول `templates` بـ SQLite. المشروع التالي يلتقطه من صف "your templates" في الـ picker — نفس السطح كما الـ 31 المشحونة، لكن خاصّة بك.
 - **حفظ الـ tabs.** كل مشروع يتذكّر ملفاته المفتوحة والتبويب النشط في جدول `tabs`. أعد فتح المشروع غداً، تجد مساحة العمل كما تركتها بالضبط.
 - **API لفحص الـ artifact.** `POST /api/artifacts/lint` يُجري فحوصات بنيوية على artifact مولَّد (كسر إطار `<artifact>`، ملفات side files مفقودة، tokens لوحة قديمة) ويعيد نتائج يمكن للوكيل قراءتها في الجولة التالية. التقييم الذاتي خماسي الأبعاد يستخدم هذا ليؤسّس درجته على دليل حقيقي، لا انطباع.
-- **بروتوكول sidecar + أتمتة سطح المكتب.** عمليات الـ daemon والويب وسطح المكتب تحمل stamps خماسية الحقول (`app · mode · namespace · ipc · source`) وتعرض قناة JSON-RPC IPC على `/tmp/open-design/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status \| eval \| screenshot` يقود تلك القناة، فيعمل E2E بدون رأس على غلاف Electron حقيقي بدون harnesses خاصة ([`packages/sidecar-proto/`](packages/sidecar-proto/)، [`apps/desktop/src/main/`](apps/desktop/src/main/)).
+- **بروتوكول sidecar + أتمتة سطح المكتب.** عمليات الـ daemon والويب وسطح المكتب تحمل stamps خماسية الحقول (`app · mode · namespace · ipc · source`) وتعرض قناة JSON-RPC IPC على `/tmp/open-make/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status \| eval \| screenshot` يقود تلك القناة، فيعمل E2E بدون رأس على غلاف Electron حقيقي بدون harnesses خاصة ([`packages/sidecar-proto/`](packages/sidecar-proto/)، [`apps/desktop/src/main/`](apps/desktop/src/main/)).
 - **spawn ودود لـ Windows.** كل adapter قد ينفجر `CreateProcess` عند حدّ ~32 KB لـ argv ببرومبتات طويلة (Codex، Gemini، OpenCode، Cursor Agent، Qwen، Qoder CLI، Pi) يُمرَّر له البرومبت عبر stdin بدلاً من ذلك. Claude Code و Copilot يحتفظان بـ `-p`؛ ويتراجع الـ daemon إلى ملف برومبت مؤقت إن تجاوز ذلك أيضاً.
 - **بيانات runtime لكل namespace.** `OD_DATA_DIR` و`--namespace` يمنحانك أشجار `.od/`-style معزولة تماماً، فلا تتشارك Playwright وقنوات beta ومشاريعك الفعلية ملف SQLite واحد.
 
@@ -668,7 +668,7 @@ OD لا يقف عند الكود. نفس واجهة الـ chat التي تنت�
 
 ## مقارنة
 
-| المحور | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Design** |
+| المحور | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Make** |
 |---|---|---|---|
 | الترخيص | مغلق | MIT | **Apache-2.0** |
 | الشكل | ويب (claude.ai) | سطح مكتب (Electron) | **تطبيق ويب + daemon محلي** |
@@ -769,7 +769,7 @@ OD لا يقف عند الكود. نفس واجهة الـ chat التي تنت�
 ## أعطنا ★
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Star Open Design on GitHub — github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Star Open Make on GitHub — github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 إن وفّر هذا عليك ثلاثين دقيقة — أعطه ★. النجوم لا تدفع الإيجار، لكنها تخبر المصمّم والوكيل والمساهم القادم أن هذه التجربة تستحقّ انتباههم. نقرة واحدة، ثلاث ثوانٍ، إشارة حقيقية: [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design).
@@ -786,10 +786,10 @@ Issues و PRs و skills جديدة وأنظمة تصميم جديدة، كلّه
 
 ## المساهمون
 
-شكراً لكلّ من ساعد في دفع Open Design للأمام — بكود، بوثائق، بملاحظات، بـ skills جديدة، بأنظمة تصميم جديدة، أو حتى بـ issue حادّة. كلّ مساهمة حقيقية تهمّ، والجدار أدناه أسهل طريقة لقول ذلك علناً.
+شكراً لكلّ من ساعد في دفع Open Make للأمام — بكود، بوثائق، بملاحظات، بـ skills جديدة، بأنظمة تصميم جديدة، أو حتى بـ issue حادّة. كلّ مساهمة حقيقية تهمّ، والجدار أدناه أسهل طريقة لقول ذلك علناً.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Design contributors" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Open Make contributors" />
 </a>
 
 إن شحنت أوّل PR — مرحباً. تصنيف [`good-first-issue`](https://github.com/nexu-io/open-design/labels/good-first-issue) هو نقطة الدخول.
@@ -797,7 +797,7 @@ Issues و PRs و skills جديدة وأنظمة تصميم جديدة، كلّه
 ## نشاط المستودع
 
 <picture>
-  <img alt="Open Design — repository metrics" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Make — repository metrics" src="docs/assets/github-metrics.svg" />
 </picture>
 
 يُعاد توليد SVG أعلاه يومياً عبر [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) باستخدام [`lowlighter/metrics`](https://github.com/lowlighter/metrics). أطلق تحديثاً يدوياً من تبويب **Actions** إن أردته أسرع؛ لإضافات أغنى (traffic، follow-up time)، أضف سرّ مستودع `METRICS_TOKEN` بـ PAT دقيق التحكّم.
@@ -808,7 +808,7 @@ Issues و PRs و skills جديدة وأنظمة تصميم جديدة، كلّه
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-09" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
-    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
+    <img alt="Open Make star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
   </picture>
 </a>
 

@@ -1,9 +1,24 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
 import { useT } from '../i18n';
 import type { Dict } from '../i18n/types';
 import { projectRawUrl } from '../providers/registry';
 import type { TodoItem } from '../runtime/todos';
-import type { AppConfig, ChatAttachment, ChatCommentAttachment, ChatMessage, Conversation, PreviewComment, ProjectFile, ProjectMetadata } from '../types';
+import type {
+  AppConfig,
+  ChatAttachment,
+  ChatCommentAttachment,
+  ChatMessage,
+  Conversation,
+  DesignSystemSummary,
+  MediaProviderCredentials,
+  PreviewComment,
+  ProjectFile,
+  ProjectMetadata,
+  ProjectTemplate,
+  PromptTemplateSummary,
+  SkillSummary,
+} from '../types';
+import type { ConnectorDetail } from '@open-design/contracts';
 import { dayKey, dayLabel, exactDateTime, messageTime, relativeTimeLong } from '../utils/chatTime';
 import { commentsToAttachments, simplePositionLabel } from '../comments';
 import { AssistantMessage } from './AssistantMessage';
@@ -12,6 +27,8 @@ import {
   type ChatComposerHandle,
   type ChatSendMeta,
 } from './ChatComposer';
+import type { FacetSelection } from './FacetParametersPanel';
+import type { FacetMode } from './FacetSetupPopover';
 import { Icon } from './Icon';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
@@ -99,6 +116,25 @@ interface Props {
   onProjectMetadataChange?: (metadata: ProjectMetadata) => void;
   researchAvailable?: boolean;
   onCollapse?: () => void;
+  // Facet creation chip wiring. Passed through to ChatComposer.
+  facetMode?: FacetMode;
+  facetSkillId?: string | null;
+  facetDesignSystemId?: string | null;
+  facetMetadata?: ProjectMetadata;
+  skills?: SkillSummary[];
+  designSystems?: DesignSystemSummary[];
+  defaultDesignSystemId?: string | null;
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  mediaProviders?: Record<string, MediaProviderCredentials>;
+  connectors?: ConnectorDetail[];
+  connectorsLoading?: boolean;
+  onOpenConnectorsTab?: () => void;
+  onFacetChange?: (next: FacetSelection) => void;
+  // Exposes the inner composer's `focus()` / `setDraft()` to the parent
+  // so non-composer surfaces (e.g. WorkspaceFacetHero) can drop the
+  // user back into the textarea after picking a mode.
+  composerHandleRef?: RefObject<ChatComposerHandle | null>;
 }
 
 type Tab = 'chat' | 'comments';
@@ -138,11 +174,38 @@ export function ChatPane({
   onProjectMetadataChange,
   researchAvailable,
   onCollapse,
+  facetMode,
+  facetSkillId = null,
+  facetDesignSystemId = null,
+  facetMetadata,
+  skills,
+  designSystems,
+  defaultDesignSystemId,
+  templates,
+  promptTemplates,
+  mediaProviders,
+  connectors,
+  connectorsLoading,
+  onOpenConnectorsTab,
+  onFacetChange,
+  composerHandleRef,
 }: Props) {
   const t = useT();
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyWrapRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<ChatComposerHandle | null>(null);
+  // Mirror the inner composer handle out to the parent's ref (when
+  // provided). We do it via useImperativeHandle on a synthetic object
+  // because composerRef itself only fills in once the inner forwardRef
+  // has mounted.
+  useImperativeHandle(
+    composerHandleRef ?? { current: null },
+    () => ({
+      setDraft: (text: string) => composerRef.current?.setDraft(text),
+      focus: () => composerRef.current?.focus(),
+    }),
+    [composerHandleRef],
+  );
   const didInitialScrollRef = useRef(false);
   // Tracks whether the user is glued close enough to the bottom that
   // streamed content should auto-follow. Distinct from the jump-button
@@ -600,6 +663,20 @@ export function ChatPane({
             researchAvailable={researchAvailable}
             projectMetadata={projectMetadata}
             onProjectMetadataChange={onProjectMetadataChange}
+            facetMode={facetMode}
+            facetSkillId={facetSkillId}
+            facetDesignSystemId={facetDesignSystemId}
+            facetMetadata={facetMetadata}
+            skills={skills}
+            designSystems={designSystems}
+            defaultDesignSystemId={defaultDesignSystemId}
+            templates={templates}
+            promptTemplates={promptTemplates}
+            mediaProviders={mediaProviders}
+            connectors={connectors}
+            connectorsLoading={connectorsLoading}
+            onOpenConnectorsTab={onOpenConnectorsTab}
+            onFacetChange={onFacetChange}
           />
         </>
       ) : null}

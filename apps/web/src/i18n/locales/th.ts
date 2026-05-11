@@ -39,7 +39,7 @@ export const th: Dict = {
   'common.daysShort': '{n} วัน',
   'common.untitled': 'ไม่มีชื่อ',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'ตัวอย่างเพื่อการวิจัย',
   'app.brandSubtitle': 'โดย Nexu Labs',
   'app.welcomeLoading': 'กำลังโหลดพื้นที่ทำงาน…',

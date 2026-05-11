@@ -12,9 +12,23 @@ import { projectRawUrl, uploadProjectFiles, openFolderDialog } from "../provider
 import { patchProject } from "../state/projects";
 import { fetchMcpServers } from "../state/mcp";
 import type { McpServerConfig } from "../state/mcp";
-import type { AppConfig, ChatAttachment, ChatCommentAttachment, ProjectFile, ProjectMetadata } from "../types";
-import type { ResearchOptions } from '@open-design/contracts';
+import type {
+  AppConfig,
+  ChatAttachment,
+  ChatCommentAttachment,
+  DesignSystemSummary,
+  MediaProviderCredentials,
+  ProjectFile,
+  ProjectMetadata,
+  ProjectTemplate,
+  PromptTemplateSummary,
+  SkillSummary,
+} from "../types";
+import type { ConnectorDetail, ResearchOptions } from '@open-design/contracts';
 import { Icon } from "./Icon";
+import { FacetModeChip } from "./FacetModeChip";
+import type { FacetSelection } from "./FacetParametersPanel";
+import type { FacetMode } from "./FacetSetupPopover";
 import { BUILT_IN_PETS, CUSTOM_PET_ID, resolveActivePet } from "./pet/pets";
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
@@ -67,6 +81,26 @@ interface Props {
   researchAvailable?: boolean;
   projectMetadata?: ProjectMetadata;
   onProjectMetadataChange?: (metadata: ProjectMetadata) => void;
+  // Facet creation chip wiring (RFC `project-as-unit`). When all four
+  // are provided the composer renders a FacetModeChip in its leading
+  // area; the chip drives "what to create" without the user leaving
+  // the chat surface. Optional so the composer still works in non-
+  // project contexts (e.g. routine quick-prompt) where there's no
+  // facet to bind to.
+  facetMode?: FacetMode;
+  facetSkillId?: string | null;
+  facetDesignSystemId?: string | null;
+  facetMetadata?: ProjectMetadata;
+  skills?: SkillSummary[];
+  designSystems?: DesignSystemSummary[];
+  defaultDesignSystemId?: string | null;
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  mediaProviders?: Record<string, MediaProviderCredentials>;
+  connectors?: ConnectorDetail[];
+  connectorsLoading?: boolean;
+  onOpenConnectorsTab?: () => void;
+  onFacetChange?: (next: FacetSelection) => void;
 }
 
 // Imperative handle so ancestors (e.g. example chips in ChatPane) can
@@ -110,6 +144,20 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       researchAvailable = false,
       projectMetadata,
       onProjectMetadataChange,
+      facetMode,
+      facetSkillId = null,
+      facetDesignSystemId = null,
+      facetMetadata,
+      skills = [],
+      designSystems = [],
+      defaultDesignSystemId = null,
+      templates = [],
+      promptTemplates = [],
+      mediaProviders,
+      connectors,
+      connectorsLoading,
+      onOpenConnectorsTab,
+      onFacetChange,
     },
     ref
   ) {
@@ -758,6 +806,25 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 e.target.value = '';
               }}
             />
+            {facetMode && onFacetChange ? (
+              <FacetModeChip
+                currentMode={facetMode}
+                currentSkillId={facetSkillId}
+                currentDesignSystemId={facetDesignSystemId}
+                currentMetadata={facetMetadata}
+                skills={skills}
+                designSystems={designSystems}
+                defaultDesignSystemId={defaultDesignSystemId}
+                templates={templates}
+                promptTemplates={promptTemplates}
+                mediaProviders={mediaProviders}
+                connectors={connectors}
+                connectorsLoading={connectorsLoading}
+                onOpenConnectorsTab={onOpenConnectorsTab}
+                onChange={onFacetChange}
+                disabled={streaming}
+              />
+            ) : null}
             <div className="composer-tools-wrap">
               <button
                 ref={toolsTriggerRef}

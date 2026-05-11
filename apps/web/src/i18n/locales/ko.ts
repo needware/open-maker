@@ -39,7 +39,7 @@ export const ko: Dict = {
   'common.daysShort': '{n}일',
   'common.untitled': '제목 없음',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'Research Preview',
   'app.brandSubtitle': 'by Nexu Labs',
   'app.welcomeLoading': '워크스페이스를 불러오는 중…',

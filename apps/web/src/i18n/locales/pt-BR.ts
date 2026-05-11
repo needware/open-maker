@@ -39,7 +39,7 @@ export const ptBR: Dict = {
   'common.daysShort': '{n} d',
   'common.untitled': 'Sem título',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'Prévia de pesquisa',
   'app.brandSubtitle': 'por Nexu Labs',
   'app.welcomeLoading': 'Carregando área de trabalho…',

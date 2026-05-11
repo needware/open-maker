@@ -19,7 +19,7 @@ This file is the single source of truth for agents entering this repository. Rea
 - `apps/desktop` is the Electron shell; it discovers the web URL through sidecar IPC.
 - `apps/packaged` is the thin packaged Electron runtime entry; it starts packaged sidecars and owns the `od://` entry glue only.
 - `packages/contracts` is the pure TypeScript web/daemon app contract layer.
-- `packages/sidecar-proto` owns the Open Design sidecar business protocol; `packages/sidecar` owns the generic sidecar runtime; `packages/platform` owns generic OS process primitives.
+- `packages/sidecar-proto` owns the Open Make sidecar business protocol; `packages/sidecar` owns the generic sidecar runtime; `packages/platform` owns generic OS process primitives.
 - `tools/dev` is the local development lifecycle control plane.
 - `tools/pack` is the local packaged build/start/stop/logs control plane and mac beta release artifact preparation surface.
 - `e2e` owns user-level end-to-end smoke tests and Playwright UI automation; read `e2e/AGENTS.md` before editing its tests or commands.
@@ -64,7 +64,7 @@ This file is the single source of truth for agents entering this repository. Rea
 - Sidecar process stamps must have exactly five fields: `app`, `mode`, `namespace`, `ipc`, and `source`.
 - Orchestration layers (`tools-dev`, `tools-pack`, packaged launchers) must call package primitives; do not hand-build `--od-stamp-*` args or process-scan regexes.
 - Packaged runtime paths must be namespace-scoped and independent from daemon/web ports; ports are transient transport details only.
-- Default runtime files live under `<project-root>/.tmp/<source>/<namespace>/...`; POSIX IPC sockets are fixed at `/tmp/open-design/ipc/<namespace>/<app>.sock`.
+- Default runtime files live under `<project-root>/.tmp/<source>/<namespace>/...`; POSIX IPC sockets are fixed at `/tmp/open-make/ipc/<namespace>/<app>.sock`.
 
 ## Git commit policy
 
@@ -98,7 +98,7 @@ pnpm tools-dev run web --daemon-port 17456 --web-port 17573
 pnpm tools-dev status --json
 pnpm tools-dev logs --json
 pnpm tools-dev inspect desktop status --json
-pnpm tools-dev inspect desktop screenshot --path /tmp/open-design.png
+pnpm tools-dev inspect desktop screenshot --path /tmp/open-make.png
 pnpm tools-dev stop
 pnpm tools-dev check
 ```
@@ -109,14 +109,14 @@ pnpm typecheck
 ```
 
 ```bash
-pnpm --filter @open-design/web typecheck
-pnpm --filter @open-design/web test
-pnpm --filter @open-design/web build
-pnpm --filter @open-design/daemon test
-pnpm --filter @open-design/daemon build
-pnpm --filter @open-design/desktop build
-pnpm --filter @open-design/tools-dev build
-pnpm --filter @open-design/tools-pack build
+pnpm --filter @open-make/web typecheck
+pnpm --filter @open-make/web test
+pnpm --filter @open-make/web build
+pnpm --filter @open-make/daemon test
+pnpm --filter @open-make/daemon build
+pnpm --filter @open-make/desktop build
+pnpm --filter @open-make/tools-dev build
+pnpm --filter @open-make/tools-pack build
 ```
 
 ```bash
@@ -147,7 +147,7 @@ Desktop queries runtime status through sidecar IPC. The web URL comes from `tool
 
 ## How are sidecar-proto, sidecar, and platform split?
 
-`@open-design/sidecar-proto` owns Open Design app/mode/source constants, namespace validation, stamp fields/flags, IPC message schema, status shapes, and error semantics. `@open-design/sidecar` provides only generic bootstrap, IPC transport, path/runtime resolution, launch env, and JSON runtime files. `@open-design/platform` provides only generic OS process stamp serialization, command parsing, and process matching/search primitives, consuming the proto descriptor.
+`@open-make/sidecar-proto` owns Open Make app/mode/source constants, namespace validation, stamp fields/flags, IPC message schema, status shapes, and error semantics. `@open-make/sidecar` provides only generic bootstrap, IPC transport, path/runtime resolution, launch env, and JSON runtime files. `@open-make/platform` provides only generic OS process stamp serialization, command parsing, and process matching/search primitives, consuming the proto descriptor.
 
 ## Where is data written?
 

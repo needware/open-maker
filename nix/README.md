@@ -1,6 +1,6 @@
-# Open Design — Nix flake
+# Open Make — Nix flake
 
-This flake exposes Open Design as a reproducible package, a `nix run` entry
+This flake exposes Open Make as a reproducible package, a `nix run` entry
 point, a dev shell, and Home Manager / NixOS modules. The architecture
 mirrors the runtime: the **daemon** (`od` CLI, Express API on `/api/*`)
 and the **web frontend** (Next.js static SPA at `apps/web/out/`) are
@@ -11,12 +11,12 @@ both.
 
 | Output                                     | What it is                                                                             |
 | ------------------------------------------ | -------------------------------------------------------------------------------------- |
-| `packages.<system>.daemon`                 | The `@open-design/daemon` package — produces `bin/od`. Default output.                 |
+| `packages.<system>.daemon`                 | The `@open-make/daemon` package — produces `bin/od`. Default output.                 |
 | `packages.<system>.web`                    | The Next.js static export (`apps/web/out/`) ready to drop into any static file server. |
 | `apps.<system>.default`                    | `nix run github:nexu-io/open-design` — boots the daemon.                               |
 | `devShells.<system>.default`               | Node 24 + Corepack-pinned pnpm 10.33 — reproduces `pnpm install` locally.              |
-| `homeManagerModules.{default,open-design}` | Home Manager module — primary individual-developer interface.                          |
-| `nixosModules.{default,open-design}`       | NixOS module — secondary, for shared/server installs.                                  |
+| `homeManagerModules.{default,open-make}` | Home Manager module — primary individual-developer interface.                          |
+| `nixosModules.{default,open-make}`       | NixOS module — secondary, for shared/server installs.                                  |
 
 ## Try it without installing
 
@@ -32,14 +32,14 @@ default module:
 
 ```nix
 {
-  inputs.open-design.url = "github:nexu-io/open-design";
+  inputs.open-make.url = "github:nexu-io/open-design";
 
-  outputs = { self, home-manager, open-design, ... }: {
+  outputs = { self, home-manager, open-make, ... }: {
     homeConfigurations.you = home-manager.lib.homeManagerConfiguration {
       modules = [
-        open-design.homeManagerModules.default
+        open-make.homeManagerModules.default
         {
-          services.open-design = {
+          services.open-make = {
             enable = true;
             autoStart = true;            # systemd --user / launchd agent
             webFrontend.enable = true;   # also run the static SPA on :5174
@@ -53,30 +53,30 @@ default module:
 
 What this wires up:
 
-- Linux: `systemd --user` units `open-design.service` and (optionally)
-  `open-design-web.service`. `systemctl --user status open-design`.
-- macOS: `launchd` agents `io.nexu.open-design` and (optionally)
-  `io.nexu.open-design-web`. `launchctl print gui/$UID/io.nexu.open-design`.
+- Linux: `systemd --user` units `open-make.service` and (optionally)
+  `open-make-web.service`. `systemctl --user status open-make`.
+- macOS: `launchd` agents `io.nexu.open-make` and (optionally)
+  `io.nexu.open-make-web`. `launchctl print gui/$UID/io.nexu.open-make`.
 - Data lives in `$HOME/.od/` by default — override `dataDir` to relocate.
 
 ## (2) NixOS — for shared/server installs
 
 ```nix
 {
-  imports = [ inputs.open-design.nixosModules.default ];
+  imports = [ inputs.open-make.nixosModules.default ];
 
-  services.open-design = {
+  services.open-make = {
     enable = true;
     autoStart = true;
     openFirewall = true;
     webFrontend.enable = true;
-    user = "open-design";
-    group = "open-design";
+    user = "open-make";
+    group = "open-make";
   };
 }
 ```
 
-This creates a system user, drops a tmpfiles rule for `/var/lib/open-design`,
+This creates a system user, drops a tmpfiles rule for `/var/lib/open-make`,
 and runs the daemon under hardened systemd (`ProtectSystem=strict`,
 `PrivateTmp`, `ReadWritePaths` scoped to the data directory). Use this
 when you want a single shared instance — for individual user
@@ -84,13 +84,13 @@ configuration prefer the Home Manager module.
 
 ## (3) `webFrontend` — when to use it, when to bring your own server
 
-Open Design's frontend is a static SPA that issues relative `/api/*`,
+Open Make's frontend is a static SPA that issues relative `/api/*`,
 `/artifacts/*`, and `/frames/*` requests. Three serving options:
 
 | Option                                 | When                                                                                                                                                                                                              |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `webFrontend.enable = true`            | You want one-line setup. The module spawns a tiny Caddy file server on `webFrontend.port` (default `5174`) that serves the SPA and reverse-proxies the three path prefixes to the daemon.                         |
-| `webFrontend.enable = false` (default) | You're running nginx / Caddy / Apache / Traefik yourself. Point your server's document root at `${pkgs.open-design.web}` (or the `packages.<system>.web` output) and replicate the proxy contract in section (4). |
+| `webFrontend.enable = false` (default) | You're running nginx / Caddy / Apache / Traefik yourself. Point your server's document root at `${pkgs.open-make.web}` (or the `packages.<system>.web` output) and replicate the proxy contract in section (4). |
 | Skip the frontend entirely             | You only need the daemon's API for headless agent dispatch.                                                                                                                                                       |
 
 The two services are independent. `autoStart` controls the daemon;
@@ -102,7 +102,7 @@ The two services are independent. `autoStart` controls the daemon;
 > `http://127.0.0.1:8080` while the daemon stays on `:7457`), the
 > daemon's same-origin gate will 403 the SPA's writes until you tell
 > it about that origin. Either set
-> `services.open-design.webFrontend.allowedOrigins = [ "<your-proxy-origin>" ]`
+> `services.open-make.webFrontend.allowedOrigins = [ "<your-proxy-origin>" ]`
 > (which feeds `OD_ALLOWED_ORIGINS`) or, for the loopback-only
 > split-port case, set `extraEnv.OD_WEB_PORT = "<proxy-port>"`. See
 > section (4) for the full decision tree.
@@ -116,7 +116,7 @@ modules assert at eval time that the second is set whenever the
 first is widened:
 
 ```nix
-services.open-design.webFrontend = {
+services.open-make.webFrontend = {
   enable = true;
   host = "0.0.0.0";  # caddy listener
   # Every external origin browsers will load the SPA from. The daemon
@@ -130,7 +130,7 @@ services.open-design.webFrontend = {
   ];
 };
 # On NixOS you also need:
-services.open-design.openFirewall = true;
+services.open-make.openFirewall = true;
 ```
 
 Under the hood `allowedOrigins` is forwarded to the daemon as the
@@ -168,14 +168,14 @@ responses for ~80s and surface as `ERR_INCOMPLETE_CHUNKED_ENCODING`).
 
 If you serve the static bundle yourself, replicate that shape:
 
-- Document root → `${pkgs.open-design.web}` (or
+- Document root → `${pkgs.open-make.web}` (or
   `packages.<system>.web`).
 - Reverse-proxy `/api/*`, `/artifacts/*`, `/frames/*` to the daemon's
   bind address; `/api/*` must stream chunks immediately and skip
   response compression.
 - SPA fallback for unmatched paths → `index.html`.
 
-The static-server's environment does not need any Open Design env
+The static-server's environment does not need any Open Make env
 vars — but **the daemon's environment usually does**, because its
 same-origin gate is built from `OD_BIND_HOST:port` (loopback hosts
 included). The browser's `Origin` and `Host` are whatever your proxy
@@ -185,8 +185,8 @@ the daemon will 403 every PUT/POST until told otherwise:
 | Your custom-server setup                                                                                                                    | What to set on the daemon                                                                                                                         |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Proxy at `http://127.0.0.1:<daemon-port>` (same host, same port — unusual)                                                                  | Nothing.                                                                                                                                          |
-| Proxy at a loopback host but different port (e.g. `http://127.0.0.1:8080` while daemon is on `:7457`)                                       | Either `extraEnv.OD_WEB_PORT = "8080"` (whitelists `8080` on every loopback host) or `services.open-design.webFrontend.allowedOrigins`.           |
-| Proxy on any non-loopback host (LAN IP, mDNS name, Tailscale name, public domain — `https://od.example.com`, `http://laptop.local:5174`, …) | `services.open-design.webFrontend.allowedOrigins = [ "<full origin>" ]`. List every scheme + host[:port] combo a browser might load the SPA from. |
+| Proxy at a loopback host but different port (e.g. `http://127.0.0.1:8080` while daemon is on `:7457`)                                       | Either `extraEnv.OD_WEB_PORT = "8080"` (whitelists `8080` on every loopback host) or `services.open-make.webFrontend.allowedOrigins`.           |
+| Proxy on any non-loopback host (LAN IP, mDNS name, Tailscale name, public domain — `https://od.example.com`, `http://laptop.local:5174`, …) | `services.open-make.webFrontend.allowedOrigins = [ "<full origin>" ]`. List every scheme + host[:port] combo a browser might load the SPA from. |
 
 `webFrontend.allowedOrigins` is forwarded to the daemon as
 `OD_ALLOWED_ORIGINS`; if you run the daemon outside the modules,
@@ -209,11 +209,11 @@ Recommended secret managers:
 - [agenix](https://github.com/ryantm/agenix) — age-encrypted single
   files, dropped into `/run/agenix/` at boot.
 
-Either renders to a file like `/run/secrets/open-design.env`; pass that
+Either renders to a file like `/run/secrets/open-make.env`; pass that
 path:
 
 ```nix
-services.open-design.environmentFile = "/run/secrets/open-design.env";
+services.open-make.environmentFile = "/run/secrets/open-make.env";
 ```
 
 Never inline a secret with `pkgs.writeText` or `home.file`.
@@ -232,5 +232,5 @@ at the top of each file and re-run. Bump the hash whenever
 `.github/workflows/nix-check.yml` runs `nix flake check` followed by
 separate `nix build .#daemon` and `nix build .#web` steps on each push
 that touches the flake or the lockfile. Build artifacts are cached on
-the `nexu-open-design` Cachix instance — PRs from forks read from the
+the `nexu-open-make` Cachix instance — PRs from forks read from the
 cache without needing the auth token.

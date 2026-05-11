@@ -1,15 +1,9 @@
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' role='img' aria-label='Open Design'>
-  <title>Open Design</title>
-  <g stroke='#1F1B16' stroke-width='3.4' stroke-linecap='square' fill='none'>
-    <path d='M10 24 L10 10 L24 10' />
-    <path d='M40 10 L54 10 L54 24' />
-    <path d='M54 40 L54 54 L40 54' />
-    <path d='M24 54 L10 54 L10 40' />
-  </g>
-  <g stroke='#C2532D' stroke-width='3' stroke-linecap='round'>
-    <line x1='32' y1='20' x2='32' y2='44' />
-    <line x1='20' y1='32' x2='44' y2='32' />
-    <line x1='23.51' y1='23.51' x2='40.49' y2='40.49' />
-    <line x1='40.49' y1='23.51' x2='23.51' y2='40.49' />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="make">
+  <title>make</title>
+  <!-- Transparent variant of the make mark for inline usage on any
+       background  splash zones, README inline, login screens. The
+       opaque app plate (with the dark rounded square) lives in
+       app-icon.svg. -->
+  <rect x="26" y="6" width="12" height="52" rx="1.6" fill="#1a1916"/>
+  <rect x="6" y="26" width="52" height="12" rx="1.6" fill="#c96442"/>
 </svg>

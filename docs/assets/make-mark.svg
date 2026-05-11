@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="make">
+  <title>make</title>
+  <!-- Vertical bar: ink-black structural backbone. Reads as a column
+       gutter, an editorial rule, or the stem of a serif glyph
+       depending on context. Always the load-bearing element. -->
+  <rect x="26" y="6" width="12" height="52" rx="1.6" fill="#1a1916"/>
+  <!-- Horizontal bar: warm-rust accent. Layered on top so the
+       intersection reads as the creative gesture completing the
+       structural form. The "+" is the maker movement's hand sign for
+       "add, construct, make"  the brand inherits that lineage. -->
+  <rect x="6" y="26" width="52" height="12" rx="1.6" fill="#c96442"/>
+</svg>

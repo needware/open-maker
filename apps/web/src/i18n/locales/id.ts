@@ -39,7 +39,7 @@ export const id: Dict = {
   'common.daysShort': '{n}h',
   'common.untitled': 'Tanpa judul',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'Pratinjau Riset',
   'app.brandSubtitle': 'oleh Nexu Labs',
   'app.welcomeLoading': 'Memuat workspace...',

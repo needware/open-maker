@@ -1,6 +1,6 @@
 # Docker deployment
 
-This deployment ships Open Design as a single Alpine-based runtime image. The
+This deployment ships Open Make as a single Alpine-based runtime image. The
 daemon serves both the API and the built Next.js static export, so there is no
 separate nginx container.
 
@@ -8,8 +8,8 @@ separate nginx container.
 
 ```bash
 cd deploy
-OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-design:latest docker compose pull
-OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-design:latest docker compose up -d --no-build
+OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-make:latest docker compose pull
+OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-make:latest docker compose up -d --no-build
 ```
 
 Defaults:
@@ -35,7 +35,7 @@ OPEN_DESIGN_ALLOWED_ORIGINS=https://od.example.com,http://203.0.113.10:7456 dock
 Pin a specific published image with a digest instead of the mutable `latest` tag:
 
 ```bash
-OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-design@sha256:<digest> docker compose up -d --no-build
+OPEN_DESIGN_IMAGE=docker.io/vanjayak/open-make@sha256:<digest> docker compose up -d --no-build
 ```
 The image intentionally does not bundle Claude/Codex/Gemini CLI binaries. Keep
 those outside the image, or build a separate private runtime layer if a server
@@ -51,12 +51,12 @@ Useful overrides:
 
 ```bash
 IMAGE_NAMESPACE=your-dockerhub-user deploy/scripts/publish-images.sh --arch arm64
-deploy/scripts/publish-images.sh --image docker.io/your-user/open-design:0.1.0
+deploy/scripts/publish-images.sh --image docker.io/your-user/open-make:0.1.0
 ```
 
 The script defaults to:
 
-- `docker.io/vanjayak/open-design:<tag>`
+- `docker.io/vanjayak/open-make:<tag>`
 - `linux/amd64,linux/arm64`
 - `skopeo` push strategy with Docker credentials read from `~/.docker/config.json`
 - preloading base images through `skopeo` to reduce Docker Hub pull flakiness

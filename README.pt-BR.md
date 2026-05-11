@@ -1,9 +1,9 @@
-# Open Design
+# Open Make
 
 > **A alternativa open-source ao [Claude Design][cd].** Local-first, deployável via web, BYOK em toda camada — **16 CLIs de agentes de código** detectados automaticamente no seu `PATH` (Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI) viram a engine de design, dirigidos por **31 Skills compositáveis** e **72 Design Systems de qualidade de marca**. Sem CLI? Um proxy BYOK compatível com OpenAI é o mesmo loop, só sem o spawn.
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Design — capa editorial: design com o agente no seu laptop" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Make — capa editorial: design com o agente no seu laptop" width="100%" />
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@
 
 O [Claude Design][cd] da Anthropic (lançado em 2026-04-17, com Opus 4.7) mostrou o que acontece quando um LLM para de escrever prosa e começa a entregar artifacts de design. Bombou — e ficou closed-source, pago, só na nuvem, preso ao modelo da Anthropic e às skills da Anthropic. Não tem checkout, não tem self-host, não tem deploy na Vercel, não tem swap-do-seu-próprio-agente.
 
-**O Open Design (OD) é a alternativa open-source.** Mesmo loop, mesmo modelo mental orientado a artifact, sem nenhum trava. A gente não despacha um agente — os agentes de código mais fortes já estão no seu laptop. A gente os pluga em um workflow de design orientado a skills que roda local com `pnpm tools-dev`, pode subir a camada web na Vercel e mantém BYOK em toda camada.
+**O Open Make (OD) é a alternativa open-source.** Mesmo loop, mesmo modelo mental orientado a artifact, sem nenhum trava. A gente não despacha um agente — os agentes de código mais fortes já estão no seu laptop. A gente os pluga em um workflow de design orientado a skills que roda local com `pnpm tools-dev`, pode subir a camada web na Vercel e mantém BYOK em toda camada.
 
 Digite `me faz um pitch deck estilo revista para nossa rodada seed`. O formulário de perguntas interativo aparece antes de o modelo improvisar um pixel. O agente escolhe uma de cinco direções visuais curadas. Um plano `TodoWrite` ao vivo flui para a UI. O daemon constrói uma pasta de projeto real em disco com template-semente, biblioteca de layouts e checklist de auto-checagem. O agente lê tudo — pre-flight forçado — roda uma crítica em cinco dimensões contra a própria saída e emite um único `<artifact>` que renderiza num iframe sandboxed em segundos.
 
@@ -275,7 +275,7 @@ Toda camada é compositável. Toda camada é um arquivo que dá pra editar. Leia
    │  /api/upload          /api/projects/:id/files…
    │  /artifacts (static)  /frames (static)
    │
-   │  optional: sidecar IPC at /tmp/open-design/ipc/<ns>/<app>.sock
+   │  optional: sidecar IPC at /tmp/open-make/ipc/<ns>/<app>.sock
    │  (STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN)
    └─────────┬────────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -303,7 +303,7 @@ Toda camada é compositável. Toda camada é um arquivo que dá pra editar. Leia
 
 ### Baixe o aplicativo desktop (sem build necessário)
 
-A maneira mais rápida de experimentar o Open Design é o aplicativo desktop pré-compilado — sem Node, sem pnpm, sem clone:
+A maneira mais rápida de experimentar o Open Make é o aplicativo desktop pré-compilado — sem Node, sem pnpm, sem clone:
 
 - **[open-design.ai](https://open-design.ai/)** — página oficial de downloads
 - **[Releases do GitHub](https://github.com/nexu-io/open-design/releases)**
@@ -312,7 +312,7 @@ A maneira mais rápida de experimentar o Open Design é o aplicativo desktop pr�
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-design
+cd open-make
 corepack enable
 corepack pnpm --version   # should print 10.33.2
 pnpm install
@@ -355,7 +355,7 @@ Mapa completo de arquivos, scripts e troubleshooting → [`QUICKSTART.pt-BR.md`]
 ## Estrutura do repositório
 
 ```
-open-design/
+open-make/
 ├── README.md                      ← this file
 ├── README.pt-BR.md                ← Português (Brasil)
 ├── README.de.md                   ← Deutsch
@@ -395,7 +395,7 @@ open-design/
 │
 ├── packages/
 │   ├── contracts/                 ← shared web/daemon app contracts
-│   ├── sidecar-proto/             ← Open Design sidecar protocol contract
+│   ├── sidecar-proto/             ← Open Make sidecar protocol contract
 │   ├── sidecar/                   ← generic sidecar runtime primitives
 │   └── platform/                  ← generic process/platform primitives
 │
@@ -543,7 +543,7 @@ Clique em qualquer thumbnail para tocar o MP4 renderizado de fato. Set completo 
 
 ### HyperFrames — motion graphics HTML→MP4 (11 templates prontos)
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) é o framework open-source de vídeo agent-native da HeyGen — você (ou o agente) escreve HTML + CSS + GSAP, o HyperFrames renderiza em MP4 determinístico via headless Chrome + FFmpeg. O Open Design despacha o HyperFrames como modelo de vídeo de primeira classe (`hyperframes-html`) plugado ao dispatch do daemon, mais a skill `skills/hyperframes/` que ensina ao agente o contrato de timeline, regras de transição entre cenas, padrões audio-reativos, captions/TTS e os blocos do catálogo (`npx hyperframes add <slug>`).
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) é o framework open-source de vídeo agent-native da HeyGen — você (ou o agente) escreve HTML + CSS + GSAP, o HyperFrames renderiza em MP4 determinístico via headless Chrome + FFmpeg. O Open Make despacha o HyperFrames como modelo de vídeo de primeira classe (`hyperframes-html`) plugado ao dispatch do daemon, mais a skill `skills/hyperframes/` que ensina ao agente o contrato de timeline, regras de transição entre cenas, padrões audio-reativos, captions/TTS e os blocos do catálogo (`npx hyperframes add <slug>`).
 
 Onze prompts hyperframes vivem em [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/), cada um sendo um brief concreto que produz um arquétipo específico:
 
@@ -581,7 +581,7 @@ O loop chat / artifact é o destaque, mas algumas capacidades menos visíveis j�
 - **Templates salvos pelo usuário.** Quando você gosta de um render, `POST /api/templates` faz snapshot do HTML + metadados na tabela `templates` do SQLite. O próximo projeto pega ele numa linha "your templates" no picker — mesma superfície dos 31 entregues, mas seu.
 - **Persistência de tabs.** Todo projeto lembra os arquivos abertos e a tab ativa na tabela `tabs`. Reabra o projeto amanhã e o workspace está exatamente como você deixou.
 - **API de lint de artifact.** `POST /api/artifacts/lint` roda checagens estruturais num artifact gerado (framing `<artifact>` quebrado, side files obrigatórios faltando, tokens de paleta velhos) e devolve findings que o agente pode reler na próxima turn. A autocrítica de 5-dim usa isso para ancorar a nota em evidência real, não em vibes.
-- **Protocolo de sidecar + automação desktop.** Daemon, web e desktop carregam stamps tipados de cinco campos (`app · mode · namespace · ipc · source`) e expõem um canal IPC JSON-RPC em `/tmp/open-design/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status \| eval \| screenshot` dirige esse canal, então E2E headless funciona contra um shell Electron real sem harnesses customizados ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
+- **Protocolo de sidecar + automação desktop.** Daemon, web e desktop carregam stamps tipados de cinco campos (`app · mode · namespace · ipc · source`) e expõem um canal IPC JSON-RPC em `/tmp/open-make/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status \| eval \| screenshot` dirige esse canal, então E2E headless funciona contra um shell Electron real sem harnesses customizados ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
 - **Spawn amigável a Windows.** Todo adapter que estouraria o limite de ~32 KB de argv do `CreateProcess` em prompts compostos longos (Codex, Gemini, OpenCode, Cursor Agent, Qwen, Qoder CLI, Pi) entrega o prompt via stdin. Claude Code e Copilot ficam com `-p`; o daemon faz fallback para arquivo temporário de prompt quando até isso transborda.
 - **Dados de runtime por namespace.** `OD_DATA_DIR` e `--namespace` te dão árvores estilo `.od/` totalmente isoladas, então Playwright, canais beta e seus projetos reais nunca compartilham um arquivo SQLite.
 
@@ -598,7 +598,7 @@ Toda a maquinaria abaixo é o playbook do [`huashu-design`](https://github.com/a
 
 ## Comparação
 
-| Eixo | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Design** |
+| Eixo | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Make** |
 |---|---|---|---|
 | Licença | Closed | MIT | **Apache-2.0** |
 | Form factor | Web (claude.ai) | Desktop (Electron) | **Web app + daemon local** |
@@ -699,7 +699,7 @@ Esta é uma implementação inicial — o loop fechado (detectar → escolher sk
 ## Dê uma estrela
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Dê estrela ao Open Design no GitHub — github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Dê estrela ao Open Make no GitHub — github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 Se isso te poupou trinta minutos — dá um ★. Estrelas não pagam aluguel, mas dizem para a próxima designer, agente e contribuidora que esse experimento vale a atenção. Um clique, três segundos, sinal real: [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design).
@@ -716,10 +716,10 @@ Walkthrough completo, barra para mergear, estilo de código e o que não aceitam
 
 ## Contribuidoras e contribuidores
 
-Obrigado a todas as pessoas que ajudaram a empurrar o Open Design pra frente — via código, docs, feedback, novas skills, novos design systems ou até uma issue afiada. Toda contribuição real conta, e a parede abaixo é a forma mais simples de dizer isso em voz alta.
+Obrigado a todas as pessoas que ajudaram a empurrar o Open Make pra frente — via código, docs, feedback, novas skills, novos design systems ou até uma issue afiada. Toda contribuição real conta, e a parede abaixo é a forma mais simples de dizer isso em voz alta.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Contribuidoras e contribuidores do Open Design" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Contribuidoras e contribuidores do Open Make" />
 </a>
 
 Se você acabou de mandar seu primeiro PR — bem-vindo. A label [`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) é o ponto de entrada.
@@ -727,7 +727,7 @@ Se você acabou de mandar seu primeiro PR — bem-vindo. A label [`good-first-is
 ## Atividade do repositório
 
 <picture>
-  <img alt="Open Design — métricas do repositório" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Make — métricas do repositório" src="docs/assets/github-metrics.svg" />
 </picture>
 
 O SVG acima é regenerado diariamente por [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) usando [`lowlighter/metrics`](https://github.com/lowlighter/metrics). Dispare um refresh manual pela aba **Actions** se quiser antes; para plugins mais ricos (tráfego, follow-up time), adicione um secret de repositório `METRICS_TOKEN` com um PAT fine-grained.
@@ -738,7 +738,7 @@ O SVG acima é regenerado diariamente por [`.github/workflows/metrics.yml`](.git
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-09" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
-    <img alt="Histórico de estrelas do Open Design" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
+    <img alt="Histórico de estrelas do Open Make" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
   </picture>
 </a>
 

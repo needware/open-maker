@@ -113,10 +113,15 @@ export async function listRecentProjects(): Promise<RecentProjectsResult> {
  * as the click-to-pick fallback when `window.electronAPI.pickFolder` is
  * unavailable (browser dev / headless tests).
  *
- * `null` on transport failure so the dialog can render an inline error
- * row instead of crashing the whole tree. The daemon itself returns
- * `entries: []` + `error: { code, message }` for permission failures, so
- * a non-null result with `entries.length === 0` is meaningful too.
+ * Returns a discriminated outcome so the picker can tell apart three
+ * very different failure modes — and stop accusing the daemon of being
+ * down when it's actually answering with a structured FS error:
+ *   - `transport-error` — fetch threw (CORS, daemon really down, network)
+ *   - `http-error`      — daemon answered with a non-2xx (`FS_NOT_FOUND`,
+ *                         `FS_NOT_DIR`, `INTERNAL_ERROR`); we surface the
+ *                         daemon's own error code/message verbatim
+ *   - `ok`              — daemon answered 2xx; the inner `result.error`
+ *                         (e.g. `EACCES`) is a soft, navigable failure
  */
 export interface FsLsEntry {
   name: string;
@@ -131,26 +136,66 @@ export interface FsLsResult {
   error?: { code: string; message: string };
 }
 
-export async function listDir(p?: string, options?: { showHidden?: boolean }): Promise<FsLsResult | null> {
+export type FsLsOutcome =
+  | { kind: 'ok'; result: FsLsResult }
+  | { kind: 'transport-error'; message: string }
+  | { kind: 'http-error'; status: number; code?: string; message: string };
+
+export async function listDir(
+  p?: string,
+  options?: { showHidden?: boolean },
+): Promise<FsLsOutcome> {
+  let resp: Response;
   try {
     const params = new URLSearchParams();
     if (p) params.set('path', p);
     if (options?.showHidden) params.set('showHidden', '1');
     const qs = params.toString();
-    const resp = await fetch(`/api/fs/ls${qs ? `?${qs}` : ''}`);
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as Partial<FsLsResult>;
-    if (typeof json.path !== 'string') return null;
+    resp = await fetch(`/api/fs/ls${qs ? `?${qs}` : ''}`);
+  } catch (err) {
+    return { kind: 'transport-error', message: String(err) };
+  }
+  if (!resp.ok) {
+    let code: string | undefined;
+    let message = `HTTP ${resp.status}`;
+    try {
+      const body = (await resp.json()) as {
+        error?: { code?: string; message?: string };
+      };
+      if (body.error?.code) code = body.error.code;
+      if (body.error?.message) message = body.error.message;
+    } catch {
+      // Non-JSON error body — keep the generic HTTP status message.
+    }
+    return { kind: 'http-error', status: resp.status, code, message };
+  }
+  let json: Partial<FsLsResult>;
+  try {
+    json = (await resp.json()) as Partial<FsLsResult>;
+  } catch (err) {
     return {
+      kind: 'http-error',
+      status: resp.status,
+      message: `malformed response: ${String(err)}`,
+    };
+  }
+  if (typeof json.path !== 'string') {
+    return {
+      kind: 'http-error',
+      status: resp.status,
+      message: 'malformed response: missing "path" field',
+    };
+  }
+  return {
+    kind: 'ok',
+    result: {
       path: json.path,
       parent: typeof json.parent === 'string' ? json.parent : null,
       home: typeof json.home === 'string' ? json.home : '',
       entries: Array.isArray(json.entries) ? json.entries : [],
       error: json.error,
-    };
-  } catch {
-    return null;
-  }
+    },
+  };
 }
 
 // ---------- templates ----------

@@ -40,7 +40,7 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
   - HTTP/SSE API on `:7456`
   - agent detection + cached results
   - skill registry (scan three dirs, hot-reload)
-  - **project model: project ≡ a folder on disk** (no UUID-keyed shadow tree); registry keyed by `realpath`, persisted as `~/.open-design/recent-projects.json`
+  - **project model: project ≡ a folder on disk** (no UUID-keyed shadow tree); registry keyed by `realpath`, persisted as `~/.open-make/recent-projects.json`
   - facet store at `<project-root>/artifacts/<facet-id>/` (plain files + per-facet and per-project `history.jsonl`)
   - source resolver + ToC indexer (caches under `<project-root>/.od/cache/sources/<id>/toc.json`); default-detects `["sources","docs","content","knowledge","wiki"]` and respects `KNOWLEDGE.md.sources`
   - design-system resolver, project-local `craft/` overrides
@@ -145,7 +145,7 @@ Phased plan from "spec-only today" to "usable MVP" to "published v1." All estima
 1. All four modes fully functional.
 2. Three adapters working (Claude Code, Codex, Cursor Agent); fallback chain shipping.
 3. PDF + PPTX export working for at least the `magazine-web-ppt` + `pitch-deck` skills.
-4. Deployed example at `demo.open-design.dev` (Topology C).
+4. Deployed example at `demo.open-make.dev` (Topology C).
 5. Skill author docs published; at least one third-party skill submitted.
 6. Documentation site rebuilt from these spec docs.
 

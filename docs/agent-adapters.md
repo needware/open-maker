@@ -70,7 +70,7 @@ type AgentEvent =
 
 ## 2. Detection strategy
 
-Run all adapters' `detect()` in parallel on daemon start, then cache results in `~/.open-design/agents.json` with a 24h TTL. Re-detect on daemon `SIGHUP`.
+Run all adapters' `detect()` in parallel on daemon start, then cache results in `~/.open-make/agents.json` with a 24h TTL. Re-detect on daemon `SIGHUP`.
 
 Each adapter uses **two signals**:
 

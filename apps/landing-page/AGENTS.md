@@ -6,14 +6,14 @@ records module-level boundaries for `apps/landing-page/`.
 ## Purpose
 
 `apps/landing-page` is a stand-alone static Astro site that renders
-the canonical Open Design marketing page in the **Atelier Zero** style.
+the canonical Open Make marketing page in the **Atelier Zero** style.
 It is the deployable counterpart to:
 
-- Skill: `skills/open-design-landing/` — agent workflow + the source-of-truth
+- Skill: `skills/open-make-landing/` — agent workflow + the source-of-truth
   `example.html` known-good rendering.
 - Design system: `design-systems/atelier-zero/DESIGN.md` — token spec.
-- Image assets: `skills/open-design-landing/assets/*.png` are uploaded to
-  Cloudflare R2 (`open-design-static`) and served through
+- Image assets: `skills/open-make-landing/assets/*.png` are uploaded to
+  Cloudflare R2 (`open-make-static`) and served through
   `static.open-design.ai` with Image Resizing (`format=auto`). Do not
   commit local mirrored PNGs into `apps/landing-page/public/assets/`.
 
@@ -45,14 +45,14 @@ It is the deployable counterpart to:
 ## Boundary constraints
 
 - Must remain a static Astro output.
-- Must not import from `@open-design/web`, `@open-design/daemon`,
-  `@open-design/desktop`, `@open-design/sidecar*`, or
-  `@open-design/contracts`. Those are product runtime concerns.
+- Must not import from `@open-make/web`, `@open-make/daemon`,
+  `@open-make/desktop`, `@open-make/sidecar*`, or
+  `@open-make/contracts`. Those are product runtime concerns.
 - Must not introduce a `src/` shell — keep all source under
   `app/`. If a component grows beyond ~80 lines, extract it to
   `app/_components/<name>.tsx`.
 - Must not depend on any non-Google web font.
-- When the canonical `skills/open-design-landing/example.html` changes,
+- When the canonical `skills/open-make-landing/example.html` changes,
   the corresponding section JSX in `app/page.tsx` and rules in
   `app/globals.css` must be updated to match. The two files are kept
   in lockstep.
@@ -60,9 +60,9 @@ It is the deployable counterpart to:
 ## Common commands
 
 ```bash
-pnpm --filter @open-design/landing-page dev          # http://127.0.0.1:17574
-pnpm --filter @open-design/landing-page build        # static export → out/
-pnpm --filter @open-design/landing-page typecheck
+pnpm --filter @open-make/landing-page dev          # http://127.0.0.1:17574
+pnpm --filter @open-make/landing-page build        # static export → out/
+pnpm --filter @open-make/landing-page typecheck
 ```
 
 ## When to update this app

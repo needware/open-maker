@@ -39,7 +39,7 @@ export const fa: Dict = {
   'common.daysShort': '{n}ر',
   'common.untitled': 'بدون عنوان',
 
-  'app.brand': 'Open Design',
+  'app.brand': 'make',
   'app.brandPill': 'پیش‌نمایش تحقیقاتی',
   'app.brandSubtitle': 'توسط Nexu Labs',
   'app.welcomeLoading': 'در حال بارگذاری فضای کاری…',

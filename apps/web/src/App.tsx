@@ -773,6 +773,9 @@ export function App() {
           agents={agents}
           skills={skills}
           designSystems={designSystems}
+          templates={templates}
+          promptTemplates={promptTemplates}
+          defaultDesignSystemId={config.designSystemId}
           daemonLive={daemonLive}
           onModeChange={handleModeChange}
           onAgentChange={handleAgentChange}
