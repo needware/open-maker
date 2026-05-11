@@ -39,7 +39,7 @@ export const tr: Dict = {
   'common.daysShort': '{n}g',
   'common.untitled': 'Başlıksız',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Önizleme Araştırması',
   'app.brandSubtitle': 'Nexu Labs tarafından',
   'app.welcomeLoading': 'Çalışma alanı yükleniyor…',
@@ -184,7 +184,7 @@ export const tr: Dict = {
   'settings.runtimeDevelopment': 'Geliştirme',
   'settings.versionUnavailable': 'Arka plan servisi devre dışıyken sürüm detayları mevcut değildir.',
 
-  'entry.tabDesigns': 'Tasarımlar',
+  'entry.tabWorkspace': 'Çalışma alanı',
   'entry.tabExamples': 'Örnekler',
   'entry.tabDesignSystems': 'Tasarım sistemleri',
   'entry.tabConnectors': 'Bağlayıcılar',

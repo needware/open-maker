@@ -39,7 +39,7 @@ export const ja: Dict = {
   'common.daysShort': '{n}日',
   'common.untitled': '無題',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'リサーチプレビュー',
   'app.brandSubtitle': 'by Nexu Labs',
   'app.welcomeLoading': 'ワークスペースを読み込み中…',
@@ -190,7 +190,7 @@ export const ja: Dict = {
   'settings.runtimeDevelopment': '開発環境',
   'settings.versionUnavailable': 'daemon がオフラインの間はバージョン詳細を取得できません。',
 
-  'entry.tabDesigns': 'デザイン',
+  'entry.tabWorkspace': 'ワークスペース',
   'entry.tabExamples': 'サンプル',
   'entry.tabDesignSystems': 'デザインシステム',
   'entry.openSettingsTitle': '設定',

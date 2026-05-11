@@ -389,7 +389,7 @@ export interface Dict {
   'notify.failureBody': string;
 
   // Entry view / tabs
-  'entry.tabDesigns': string;
+  'entry.tabWorkspace': string;
   'entry.tabExamples': string;
   'entry.tabDesignSystems': string;
   'entry.tabConnectors': string;

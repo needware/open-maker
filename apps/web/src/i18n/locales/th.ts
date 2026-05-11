@@ -39,7 +39,7 @@ export const th: Dict = {
   'common.daysShort': '{n} วัน',
   'common.untitled': 'ไม่มีชื่อ',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'ตัวอย่างเพื่อการวิจัย',
   'app.brandSubtitle': 'โดย Nexu Labs',
   'app.welcomeLoading': 'กำลังโหลดพื้นที่ทำงาน…',
@@ -177,7 +177,7 @@ export const th: Dict = {
   'settings.runtimeDevelopment': 'การพัฒนา',
   'settings.versionUnavailable': 'ข้อมูลเวอร์ชันไม่พร้อมใช้งานขณะที่ daemon ออฟไลน์',
 
-  'entry.tabDesigns': 'ดีไซน์',
+  'entry.tabWorkspace': 'พื้นที่ทำงาน',
   'entry.tabExamples': 'ตัวอย่าง',
   'entry.tabDesignSystems': 'ระบบการออกแบบ',
   'entry.tabConnectors': 'ตัวเชื่อมต่อ',

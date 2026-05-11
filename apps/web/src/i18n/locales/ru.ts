@@ -39,7 +39,7 @@ export const ru: Dict = {
   'common.daysShort': '{n}д',
   'common.untitled': 'Без названия',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Предварительная исследовательская версия',
   'app.brandSubtitle': 'от Nexu Labs',
   'app.welcomeLoading': 'Загрузка рабочего пространства…',
@@ -189,7 +189,7 @@ export const ru: Dict = {
   'settings.runtimeDevelopment': 'Разработка',
   'settings.versionUnavailable': 'Сведения о версии недоступны, пока daemon не запущен.',
 
-  'entry.tabDesigns': 'Дизайны',
+  'entry.tabWorkspace': 'Рабочая область',
   'entry.tabExamples': 'Примеры',
   'entry.tabDesignSystems': 'Дизайн-системы',
   'entry.tabConnectors': 'Коннекторы',

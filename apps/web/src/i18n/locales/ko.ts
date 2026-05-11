@@ -39,7 +39,7 @@ export const ko: Dict = {
   'common.daysShort': '{n}일',
   'common.untitled': '제목 없음',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Research Preview',
   'app.brandSubtitle': 'by Nexu Labs',
   'app.welcomeLoading': '워크스페이스를 불러오는 중…',
@@ -190,7 +190,7 @@ export const ko: Dict = {
   'settings.runtimeDevelopment': '개발 (Development)',
   'settings.versionUnavailable': '데몬이 오프라인 상태일 때는 버전 세부 정보를 확인할 수 없습니다.',
 
-  'entry.tabDesigns': '디자인',
+  'entry.tabWorkspace': '워크스페이스',
   'entry.tabExamples': '예제',
   'entry.tabDesignSystems': '디자인 시스템',
   'entry.tabConnectors': '커넥터',

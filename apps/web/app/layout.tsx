@@ -4,13 +4,13 @@ import { I18nProvider } from '../src/i18n';
 import '../src/index.css';
 
 export const metadata: Metadata = {
-  title: 'make',
+  title: 'maker',
   icons: {
     icon: '/app-icon.svg',
     // Safari pinned-tab mask icon — Next.js's Metadata API doesn't have a
     // dedicated `mask` field, so we surface it via the generic `other`
     // bucket which renders as a raw <link rel="mask-icon" ...>.
-    // Color matches the make brand ink #1a1916 used in app-icon.svg.
+    // Color matches the maker brand ink #1a1916 used in app-icon.svg.
     other: [{ rel: 'mask-icon', url: '/app-icon.svg', color: '#1a1916' }],
   },
 };

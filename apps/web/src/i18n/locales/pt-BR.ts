@@ -39,7 +39,7 @@ export const ptBR: Dict = {
   'common.daysShort': '{n} d',
   'common.untitled': 'Sem título',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Prévia de pesquisa',
   'app.brandSubtitle': 'por Nexu Labs',
   'app.welcomeLoading': 'Carregando área de trabalho…',
@@ -189,7 +189,7 @@ export const ptBR: Dict = {
   'settings.runtimeDevelopment': 'Desenvolvimento',
   'settings.versionUnavailable': 'Os detalhes de versão ficam indisponíveis enquanto o daemon está offline.',
 
-  'entry.tabDesigns': 'Designs',
+  'entry.tabWorkspace': 'Espaço de trabalho',
   'entry.tabExamples': 'Exemplos',
   'entry.tabDesignSystems': 'Sistemas de design',
   'entry.tabConnectors': 'Conectores',

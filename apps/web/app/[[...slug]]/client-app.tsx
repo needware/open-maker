@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic';
 // shell HTML the daemon can serve as the SPA fallback.
 const App = dynamic(() => import('../../src/App').then((m) => m.App), {
   ssr: false,
-  loading: () => <div className="od-loading-shell">Loading make…</div>,
+  loading: () => <div className="od-loading-shell">Loading maker…</div>,
 });
 
 export function ClientApp() {

@@ -39,7 +39,7 @@ export const fa: Dict = {
   'common.daysShort': '{n}ر',
   'common.untitled': 'بدون عنوان',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'پیش‌نمایش تحقیقاتی',
   'app.brandSubtitle': 'توسط Nexu Labs',
   'app.welcomeLoading': 'در حال بارگذاری فضای کاری…',
@@ -190,7 +190,7 @@ export const fa: Dict = {
   'settings.runtimeDevelopment': 'توسعه',
   'settings.versionUnavailable': 'تا وقتی daemon آفلاین است جزئیات نسخه در دسترس نیست.',
 
-  'entry.tabDesigns': 'طرح‌ها',
+  'entry.tabWorkspace': 'فضای کاری',
   'entry.tabExamples': 'نمونه‌ها',
   'entry.tabDesignSystems': 'سیستم‌های طراحی',
   'entry.tabConnectors': 'اتصال‌دهنده‌ها',

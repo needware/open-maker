@@ -37,7 +37,7 @@ export const en: Dict = {
   'common.daysShort': '{n}d',
   'common.untitled': 'Untitled',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Research Preview',
   'app.brandSubtitle': 'by Nexu Labs',
   'app.welcomeLoading': 'Loading workspace…',
@@ -244,7 +244,7 @@ export const en: Dict = {
   'settings.mcpRunningNote':
     'Open Design must be running for MCP tool calls to succeed. If you started your coding agent before opening Open Design, restart the agent so it can reach the live daemon.',
 
-  'entry.tabDesigns': 'Designs',
+  'entry.tabWorkspace': 'Workspace',
   'entry.tabExamples': 'Examples',
   'entry.tabDesignSystems': 'Design systems',
   'entry.tabConnectors': 'Connectors',

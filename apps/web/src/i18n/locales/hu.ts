@@ -39,7 +39,7 @@ export const hu: Dict = {
   'common.daysShort': '{n}n',
   'common.untitled': 'Cím nélkül',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Kutatási előzetes',
   'app.brandSubtitle': 'a Nexu Labs-tól',
   'app.welcomeLoading': 'Munkaterület betöltése…',
@@ -190,7 +190,7 @@ export const hu: Dict = {
   'settings.runtimeDevelopment': 'Fejlesztői',
   'settings.versionUnavailable': 'A verzió adatai nem érhetők el, amíg a daemon offline.',
 
-  'entry.tabDesigns': 'Tervek',
+  'entry.tabWorkspace': 'Munkaterület',
   'entry.tabExamples': 'Példák',
   'entry.tabDesignSystems': 'Designrendszerek',
   'entry.tabConnectors': 'Kapcsolók',

@@ -39,7 +39,7 @@ export const de: Dict = {
   'common.daysShort': '{n} T.',
   'common.untitled': 'Ohne Titel',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Forschungsvorschau',
   'app.brandSubtitle': 'von Nexu Labs',
   'app.welcomeLoading': 'Workspace wird geladen…',
@@ -190,7 +190,7 @@ export const de: Dict = {
   'settings.runtimeDevelopment': 'Entwicklung',
   'settings.versionUnavailable': 'Versionsdetails sind nicht verfügbar, solange der Daemon offline ist.',
 
-  'entry.tabDesigns': 'Designs',
+  'entry.tabWorkspace': 'Arbeitsbereich',
   'entry.tabExamples': 'Beispiele',
   'entry.tabDesignSystems': 'Designsysteme',
   'entry.openSettingsTitle': 'Einstellungen',

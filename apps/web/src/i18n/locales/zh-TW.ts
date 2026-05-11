@@ -39,7 +39,7 @@ export const zhTW: Dict = {
   'common.daysShort': '{n}天',
   'common.untitled': '未命名',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': '研究預覽版',
   'app.brandSubtitle': '由 Nexu Labs 出品',
   'app.welcomeLoading': '正在載入工作區…',
@@ -235,7 +235,7 @@ export const zhTW: Dict = {
   'settings.mcpRunningNote':
     'Open Design 必須正在執行，MCP 工具呼叫才能成功。如果您在開啟 Open Design 之前就已啟動 coding agent，請重新啟動 agent，使其能夠連線到正在執行的守護行程。',
 
-  'entry.tabDesigns': '我的設計',
+  'entry.tabWorkspace': '工作區',
   'entry.tabExamples': '範例',
   'entry.tabDesignSystems': '設計系統',
   'entry.tabConnectors': '連接器',

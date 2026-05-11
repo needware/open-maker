@@ -39,7 +39,7 @@ export const ar: Dict = {
   'common.daysShort': '{n} ي',
   'common.untitled': 'بدون عنوان',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'معاينة البحث',
   'app.brandSubtitle': 'بواسطة Nexu Labs',
   'app.welcomeLoading': 'جاري تحميل مساحة العمل...',
@@ -190,7 +190,7 @@ export const ar: Dict = {
   'settings.runtimeDevelopment': 'تطوير',
   'settings.versionUnavailable': 'تفاصيل النسخة غير متوفرة بينما البرنامج الخفي غير متصل.',
 
-  'entry.tabDesigns': 'التصاميم',
+  'entry.tabWorkspace': 'مساحة العمل',
   'entry.tabExamples': 'أمثلة',
   'entry.tabDesignSystems': 'أنظمة التصميم',
   'entry.tabConnectors': 'الموصلات',

@@ -37,7 +37,7 @@ export const zhCN: Dict = {
   'common.daysShort': '{n}天',
   'common.untitled': '未命名',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': '研究预览版',
   'app.brandSubtitle': '由 Nexu Labs 出品',
   'app.welcomeLoading': '正在加载工作区…',
@@ -242,7 +242,7 @@ export const zhCN: Dict = {
   'settings.mcpRunningNote':
     'Open Design 必须处于运行状态，MCP 工具调用才能成功。如果你在打开 Open Design 之前启动了编码助手，请重启助手以便它能连接到正在运行的守护进程。',
 
-  'entry.tabDesigns': '我的设计',
+  'entry.tabWorkspace': '工作区',
   'entry.tabExamples': '示例',
   'entry.tabDesignSystems': '设计体系',
   'entry.tabConnectors': '连接器',

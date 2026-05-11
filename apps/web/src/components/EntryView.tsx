@@ -24,7 +24,7 @@ import { PromptTemplatePreviewModal } from './PromptTemplatePreviewModal';
 import { PromptTemplatesTab } from './PromptTemplatesTab';
 import { apiProtocolLabel } from '../utils/apiProtocol';
 
-type TopTab = 'designs' | 'examples' | 'design-systems' | 'image-templates' | 'video-templates';
+type TopTab = 'workspace' | 'examples' | 'design-systems' | 'image-templates' | 'video-templates';
 
 // sessionStorage key for the "Use this prompt" hand-off. Read once by
 // ProjectView after the user picks a folder, then cleared. Kept as a
@@ -227,7 +227,7 @@ export function EntryView({
   onTogglePet,
 }: Props) {
   const t = useT();
-  const [topTab, setTopTab] = useState<TopTab>('designs');
+  const [topTab, setTopTab] = useState<TopTab>('workspace');
   const [previewSystemId, setPreviewSystemId] = useState<string | null>(null);
   const [previewPromptTemplate, setPreviewPromptTemplate] =
     useState<PromptTemplateSummary | null>(null);
@@ -525,7 +525,7 @@ export function EntryView({
       <main className="entry-main">
         <div className="entry-header">
           <div className="entry-tabs" role="tablist">
-            <TopTabButton current={topTab} value="designs" label={t('entry.tabDesigns')} onClick={setTopTab} />
+            <TopTabButton current={topTab} value="workspace" label={t('entry.tabWorkspace')} onClick={setTopTab} />
             <TopTabButton current={topTab} value="examples" label={t('entry.tabExamples')} onClick={setTopTab} />
             <TopTabButton
               current={topTab}
@@ -548,7 +548,7 @@ export function EntryView({
           </div>
         </div>
         <div className="entry-tab-content">
-          {topTab === 'designs' ? (
+          {topTab === 'workspace' ? (
             // DesignsTab uses skills + designSystems for tag rendering on
             // each card, so wait until projects + that metadata are present
             // to avoid a flash of "No projects yet" before the real list

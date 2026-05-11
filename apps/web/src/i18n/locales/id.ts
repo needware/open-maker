@@ -39,7 +39,7 @@ export const id: Dict = {
   'common.daysShort': '{n}h',
   'common.untitled': 'Tanpa judul',
 
-  'app.brand': 'make',
+  'app.brand': 'maker',
   'app.brandPill': 'Pratinjau Riset',
   'app.brandSubtitle': 'oleh Nexu Labs',
   'app.welcomeLoading': 'Memuat workspace...',
@@ -284,7 +284,7 @@ export const id: Dict = {
   'settings.orbit.openArtifact': 'Buka artifact',
   'settings.orbit.sourceMarkdown': 'Markdown sumber',
 
-  'entry.tabDesigns': 'Desain',
+  'entry.tabWorkspace': 'Ruang kerja',
   'entry.tabExamples': 'Contoh',
   'entry.tabDesignSystems': 'Sistem desain',
   'entry.tabConnectors': 'Konektor',

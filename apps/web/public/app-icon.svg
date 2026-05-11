@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="make">
-  <title>make</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="maker">
+  <title>maker</title>
   <!-- macOS-style rounded square plate (rx 22% of edge) so the icon
        reads as a real product app icon at all sizes  Dock, taskbar,
        chrome topbar, PWA install. Ink near-black holds contrast on
