@@ -105,7 +105,7 @@ from `LOCALES`.
    prompts, skill instructions, design systems, and prompt bodies stay in
    their source language so prompt QA remains centralized.
 9. **Run checks:** `pnpm typecheck` confirms the locale union and `DICTS`
-   map agree. `pnpm --filter @open-make/web test` covers locale/content
+   map agree. `pnpm --filter @open-maker/web test` covers locale/content
    drift tests for the web package.
 
 ## Maintaining existing translations

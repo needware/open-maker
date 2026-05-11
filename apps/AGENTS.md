@@ -39,13 +39,13 @@ Follow the root `AGENTS.md` first. This file only records module-level boundarie
 ## Common app commands
 
 ```bash
-pnpm --filter @open-make/web typecheck
-pnpm --filter @open-make/web test
-pnpm --filter @open-make/daemon typecheck
-pnpm --filter @open-make/daemon test
-pnpm --filter @open-make/daemon build
-pnpm --filter @open-make/desktop typecheck
-pnpm --filter @open-make/desktop build
-pnpm --filter @open-make/packaged typecheck
-pnpm --filter @open-make/packaged build
+pnpm --filter @open-maker/web typecheck
+pnpm --filter @open-maker/web test
+pnpm --filter @open-maker/daemon typecheck
+pnpm --filter @open-maker/daemon test
+pnpm --filter @open-maker/daemon build
+pnpm --filter @open-maker/desktop typecheck
+pnpm --filter @open-maker/desktop build
+pnpm --filter @open-maker/packaged typecheck
+pnpm --filter @open-maker/packaged build
 ```

@@ -1,9 +1,9 @@
-# Open Make
+# Open Maker
 
 > **Альтернатива з відкритим кодом до [Claude Design][cd].** Локально-перший, розгортується в web, BYOK на кожному рівні — **16 CLI агентів для кодування** автоматично виявляються у вашому `PATH` (Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI) стають механізмом дизайну, керуються **31 компонуваною навичкою** та **72 системами дизайну комерційного класу**. Немає CLI? OpenAI-сумісний BYOK проксі — це той же цикл без spawn.
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Make — editorial cover: design with the agent on your laptop" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Maker — editorial cover: design with the agent on your laptop" width="100%" />
 </p>
 
 <p align="center">
@@ -35,7 +35,7 @@
 
 [Claude Design][cd] від Anthropic (випущено 17.04.2026, Opus 4.7) показав, що відбувається, коли LLM припиняє писати прозу й починає поставляти артефакти дизайну. Це стало вірусним — і залишилось закритим кодом, тільки платним, тільки хмарним, прив'язаним до моделі Anthropic та навичок Anthropic. Немає касси, немає self-hosting, немає Vercel deploy, немає зміни на свого власного агента.
 
-**Open Make (OD) — це альтернатива з відкритим кодом.** Той же цикл, той же artifact-first менталітет, але без lock-in. Ми не поставляємо агента — найсильніші агенти для кодування вже живуть на вашому ноутбуці. Ми підключаємо їх до workflow дизайну, керованого навичками, що працює локально за допомогою `pnpm tools-dev`, може розгорнути веб-шар на Vercel, і залишається BYOK на кожному рівні.
+**Open Maker (OD) — це альтернатива з відкритим кодом.** Той же цикл, той же artifact-first менталітет, але без lock-in. Ми не поставляємо агента — найсильніші агенти для кодування вже живуть на вашому ноутбуці. Ми підключаємо їх до workflow дизайну, керованого навичками, що працює локально за допомогою `pnpm tools-dev`, може розгорнути веб-шар на Vercel, і залишається BYOK на кожному рівні.
 
 Введіть `make me a magazine-style pitch deck for our seed round`. Інтерактивна форма запитань з'являється до того, як модель навіть імпровізує один піксель. Агент вибирає один із п'яти курованих візуальних напрямків. Живий план `TodoWrite` потокує в UI. Демон будує реальну папку проекту на диску з seed шаблоном, бібліотекою макетів і контрольним списком self-check. Агент читає їх — перевірка перед польотом обов'язкова — запускає п'яти-розмірну критику проти свого власного виходу й видає один `<artifact>`, який рендериться в пісочниці iframe через кілька секунд.
 
@@ -275,7 +275,7 @@ DISCOVERY directives  (форма 1-го ходу, бранч бренду 2-г�
    │  /api/upload          /api/projects/:id/files…
    │  /artifacts (static)  /frames (static)
    │
-   │  опціонально: sidecar IPC у /tmp/open-make/ipc/<ns>/<app>.sock
+   │  опціонально: sidecar IPC у /tmp/open-maker/ipc/<ns>/<app>.sock
    │  (STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN)
    └─────────┬────────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -303,7 +303,7 @@ DISCOVERY directives  (форма 1-го ходу, бранч бренду 2-г�
 
 ### Завантажити desktop-додаток (збірка не потрібна)
 
-Найшвидший спосіб спробувати Open Make — готовий desktop-додаток, без Node, pnpm і клонування:
+Найшвидший спосіб спробувати Open Maker — готовий desktop-додаток, без Node, pnpm і клонування:
 
 - **[open-design.ai](https://open-design.ai/)** — офіційна сторінка завантаження
 - **[GitHub релізи](https://github.com/nexu-io/open-design/releases)**
@@ -312,7 +312,7 @@ DISCOVERY directives  (форма 1-го ходу, бранч бренду 2-г�
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-make
+cd open-maker
 corepack enable
 corepack pnpm --version   # має вивести 10.33.2
 pnpm install
@@ -355,7 +355,7 @@ pnpm tools-dev run web
 ## Структура репозиторію
 
 ```
-open-make/
+open-maker/
 ├── README.md                      ← цей файл
 ├── README.de.md                   ← Deutsch
 ├── README.ru.md                   ← Русский
@@ -394,7 +394,7 @@ open-make/
 │
 ├── packages/
 │   ├── contracts/                 ← спільні контракти веб/daemon додатку
-│   ├── sidecar-proto/             ← контракт протоколу sidecar Open Make
+│   ├── sidecar-proto/             ← контракт протоколу sidecar Open Maker
 │   ├── sidecar/                   ← загальні примітиви sidecar рантайму
 │   └── platform/                  ← загальні примітиви процесів/платформи
 │
@@ -542,7 +542,7 @@ OD не зупиняється на коді. Та сама поверхня ч�
 
 ### HyperFrames — HTML→MP4 моушн-графіка (11 готових до репліки шаблонів)
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) — це фреймворк відео з відкритим кодом від HeyGen, нативний для агентів: ви (або агент) пишете HTML + CSS + GSAP, HyperFrames рендерить це у детермінований MP4 через headless Chrome + FFmpeg. Open Make поставляє HyperFrames як відеомодель першого класу (`hyperframes-html`), підключену до диспетчеризації демона, плюс навичку `skills/hyperframes/`, яка навчає агента контракту таймлайну, правил переходу між сценами, аудіо-реактивних патернів, субтитрів/TTS та каталог-блоків (`npx hyperframes add <slug>`).
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) — це фреймворк відео з відкритим кодом від HeyGen, нативний для агентів: ви (або агент) пишете HTML + CSS + GSAP, HyperFrames рендерить це у детермінований MP4 через headless Chrome + FFmpeg. Open Maker поставляє HyperFrames як відеомодель першого класу (`hyperframes-html`), підключену до диспетчеризації демона, плюс навичку `skills/hyperframes/`, яка навчає агента контракту таймлайну, правил переходу між сценами, аудіо-реактивних патернів, субтитрів/TTS та каталог-блоків (`npx hyperframes add <slug>`).
 
 Одинадцять промптів hyperframes поставляються у [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/), кожен — конкретний бриф, що створює певний архетип:
 
@@ -580,7 +580,7 @@ OD не зупиняється на коді. Та сама поверхня ч�
 - **Збережені користувачем шаблони.** Коли рендер вам подобається, `POST /api/templates` створює знімок HTML + метаданих у таблиці `templates` SQLite. Наступний проект вибере його з ряду «ваші шаблони» у пікері — та ж поверхня, що й 31 вбудована, але ваша.
 - **Збереження вкладок.** Кожен проект запам'ятовує свої відкриті файли та активну вкладку у таблиці `tabs`. Відкрийте проект завтра, і робочий простір виглядатиме саме так, як ви його залишили.
 - **API лінтингу артефактів.** `POST /api/artifacts/lint` запускає структурні перевірки згенерованого артефакту (пошкоджене `<artifact>` обрамлення, відсутні необхідні side-файли, застарілі токени палітри) та повертає знахідки, які агент може прочитати у свій наступний хід. П'ятивимірна self-critique використовує це для обґрунтування оцінки реальними доказами, а не враженнями.
-- **Протокол sidecar + автоматизація desktop.** Процеси демона, вебу та desktop несуть типізовані п'ятипольні штампи (`app · mode · namespace · ipc · source`) та надають JSON-RPC IPC канал за адресою `/tmp/open-make/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status | eval | screenshot` керує цим каналом, тому headless E2E працює проти реальної Electron shell без спеціальних харнесів ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
+- **Протокол sidecar + автоматизація desktop.** Процеси демона, вебу та desktop несуть типізовані п'ятипольні штампи (`app · mode · namespace · ipc · source`) та надають JSON-RPC IPC канал за адресою `/tmp/open-maker/ipc/<namespace>/<app>.sock`. `tools-dev inspect desktop status | eval | screenshot` керує цим каналом, тому headless E2E працює проти реальної Electron shell без спеціальних харнесів ([`packages/sidecar-proto/`](packages/sidecar-proto/), [`apps/desktop/src/main/`](apps/desktop/src/main/)).
 - **Windows-дружнє породження.** Кожен адаптер, який інакше перевищив би ліміт argv ~32 КБ `CreateProcess` для довгих складених промптів (Codex, Gemini, OpenCode, Cursor Agent, Qwen, Qoder CLI, Pi), подає промпт через stdin. Claude Code та Copilot зберігають `-p`; демон відкатується до тимчасового файлу промпту, коли й це переповнюється.
 - **Дані виконання для кожного простору імен.** `OD_DATA_DIR` та `--namespace` дають вам повністю ізольовані `.od/`-дерева, тому Playwright, бета-канали та ваші реальні проекти ніколи не ділять файл SQLite.
 
@@ -597,7 +597,7 @@ OD не зупиняється на коді. Та сама поверхня ч�
 
 ## Порівняння
 
-| Вісь | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Make** |
+| Вісь | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Maker** |
 |---|---|---|---|
 | Ліцензія | Закрита | MIT | **Apache-2.0** |
 | Форм-фактор | Веб (claude.ai) | Desktop (Electron) | **Веб-додаток + локальний демон** |
@@ -698,7 +698,7 @@ OD не зупиняється на коді. Та сама поверхня ч�
 ## Поставте нам зірку
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Поставте зірку Open Make на GitHub — github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Поставте зірку Open Maker на GitHub — github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 Якщо це зекономило вам тридцять хвилин — поставте ★. Зірки не сплачують оренду, але вони кажуть наступному дизайнеру, агенту та контриб'ютору, що цей експеримент вартий їхньої уваги. Один клік, три секунди, реальний сигнал: [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design).
@@ -715,10 +715,10 @@ OD не зупиняється на коді. Та сама поверхня ч�
 
 ## Контриб'ютори
 
-Дякуємо всім, хто допоміг просувати Open Make — через код, документацію, зворотний зв'язок, нові навички, нові системи дизайну або навіть гостре питання. Кожен реальний внесок рахується, а стіна нижче — найпростіший спосіб сказати це вголос.
+Дякуємо всім, хто допоміг просувати Open Maker — через код, документацію, зворотний зв'язок, нові навички, нові системи дизайну або навіть гостре питання. Кожен реальний внесок рахується, а стіна нижче — найпростіший спосіб сказати це вголос.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Контриб'ютори Open Make" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-09" alt="Контриб'ютори Open Maker" />
 </a>
 
 Якщо ви злили свій перший PR — ласкаво просимо. Мітка [`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) — це точка входу.
@@ -726,7 +726,7 @@ OD не зупиняється на коді. Та сама поверхня ч�
 ## Активність репозиторію
 
 <picture>
-  <img alt="Open Make — метрики репозиторію" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Maker — метрики репозиторію" src="docs/assets/github-metrics.svg" />
 </picture>
 
 SVG вище перегенерується щодня [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) за допомогою [`lowlighter/metrics`](https://github.com/lowlighter/metrics). Зробіть ручне оновлення з вкладки **Actions**, якщо хочете швидше; для багатших плагінів (трафік, час відповіді) додайте секрет репозиторію `METRICS_TOKEN` з fine-grained PAT.
@@ -737,7 +737,7 @@ SVG вище перегенерується щодня [`.github/workflows/metri
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-09" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
-    <img alt="Історія зірок Open Make" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
+    <img alt="Історія зірок Open Maker" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-09" />
   </picture>
 </a>
 

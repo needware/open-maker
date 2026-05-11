@@ -151,8 +151,8 @@ Output a single file with all CSS inline. Mirror the structure of
 
 The runtime script (keyboard / wheel / touch nav, dot indicator,
 progress bar, ESC overview) should match the model documented in
-[`open-make-landing-deck/scripts/compose.ts`](../open-make-landing-deck/scripts/compose.ts).
-Do **not** reuse the open-make-landing-deck CSS; the visual
+[`open-maker-landing-deck/scripts/compose.ts`](../open-maker-landing-deck/scripts/compose.ts).
+Do **not** reuse the open-maker-landing-deck CSS; the visual
 language is different.
 
 ### 4. Self-check
@@ -181,7 +181,7 @@ language is different.
   and use solid hex from the table in
   `design-systems/kami/DESIGN.md` §2.
 - **Do not** add a router. This is a single-file artifact.
-- **Do not** reuse Atelier Zero collage imagery (the open-make-landing
+- **Do not** reuse Atelier Zero collage imagery (the open-maker-landing
   visual system). Kami is gradient-free, image-light, and hierarchy
   is carried by type.
 
@@ -189,7 +189,7 @@ language is different.
 
 - [`kami-landing`](../kami-landing/) — long-form one-pager sister skill.
 - [`design-systems/kami/DESIGN.md`](../../design-systems/kami/DESIGN.md) — token spec.
-- [`open-make-landing-deck`](../open-make-landing-deck/) — same
+- [`open-maker-landing-deck`](../open-maker-landing-deck/) — same
   horizontal swipe nav model, different visual language (Atelier Zero).
 - Upstream: [`tw93/kami`](https://github.com/tw93/kami) — original
   Claude skill (MIT). Kami's slides.py template documents the macro

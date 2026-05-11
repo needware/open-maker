@@ -32,7 +32,7 @@ agent reads `SKILL.md`, gathers the brief, then writes
 `out/index.html` directly using the tokens and components catalogued
 in [`design-systems/kami/DESIGN.md`](../../design-systems/kami/DESIGN.md).
 
-To preview the canonical Open Make instance:
+To preview the canonical Open Maker instance:
 
 ```bash
 open example.html
@@ -50,7 +50,7 @@ To start a fresh project:
 skills/kami-landing/
 ├── SKILL.md      # ← agent contract (read this first)
 ├── README.md     # ← you are here
-└── example.html  # canonical Open Make rendering
+└── example.html  # canonical Open Maker rendering
 ```
 
 ## Boundaries

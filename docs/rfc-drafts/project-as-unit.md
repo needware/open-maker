@@ -41,9 +41,9 @@ These are non-negotiable. Any design or implementation work that breaks one of t
 | 1 | **1 project ↔ 1 directory** (bijection) | Daemon does not own "project rows" decoupled from disk; two project records cannot share a `realpath`. |
 | 2 | **Creation is project-scoped** | Every generative endpoint (`POST /api/chat`, `POST /api/projects/:project/facets`, …) takes a `projectPath` (or `:project` route segment that resolves to one) and refuses to run without it. |
 | 3 | **Project context = directory contents** | `sources/`, `DESIGN.md`, `KNOWLEDGE.md`, `craft/` (project-local override), `artifacts/` are all read from the project root. Daemon-global state must not be appended to compose context. |
-| 4 | **Projects do not see each other** | No cross-project sources, no shared KB, no shared facets. `~/.open-make/recent-projects.json` is a UI list only — not a context source. |
+| 4 | **Projects do not see each other** | No cross-project sources, no shared KB, no shared facets. `~/.open-maker/recent-projects.json` is a UI list only — not a context source. |
 | 5 | **The project directory is user-owned** | Daemon does not hide files, does not enforce a layout, does not block rename/move. If the user moves the folder, OD reports "not found" on next open and waits for the user to repoint. |
-| 6 | **Outputs stay inside the project** | Facet artifacts write to `<project-root>/artifacts/<facet-id>/`. Writing outside the project root (to `/tmp/`, `~/.open-make/`, another project) is a bug. |
+| 6 | **Outputs stay inside the project** | Facet artifacts write to `<project-root>/artifacts/<facet-id>/`. Writing outside the project root (to `/tmp/`, `~/.open-maker/`, another project) is a bug. |
 
 ## Project layout
 
@@ -87,7 +87,7 @@ The first match becomes the default source root. If a `KNOWLEDGE.md` exists at t
 ```yaml
 # KNOWLEDGE.md (optional)
 ---
-name: open-make
+name: open-maker
 domain: developer-tools
 voice: technical, concise, no-marketing-fluff
 sources:
@@ -101,12 +101,12 @@ priority:
   - docs/architecture.md
 ---
 
-# Open Make
+# Open Maker
 
 (Free-form body — read by the agent as project intent.)
 ```
 
-For the open-make repository itself, no `KNOWLEDGE.md` is required: the existing `docs/` directory is auto-detected as the source root, making this repo a working example project on first open.
+For the open-maker repository itself, no `KNOWLEDGE.md` is required: the existing `docs/` directory is auto-detected as the source root, making this repo a working example project on first open.
 
 ## Inputs to creation (the four axes, restated)
 
@@ -180,7 +180,7 @@ artifacts/prototype-landing/
   "skillVersion": "git-sha-or-tag",
   "designSystem": "DESIGN.md",
   "sourcesUsed": ["sources/docs/spec.md", "sources/docs/architecture.md"],
-  "lastBrief": "SaaS landing for Open Make; hero highlights skills protocol.",
+  "lastBrief": "SaaS landing for Open Maker; hero highlights skills protocol.",
   "lastRunAt": "2026-05-10T11:00:00Z",
   "parameters": { "hero_density": 96 }
 }
@@ -233,7 +233,7 @@ UI exposes this as a chip in the run header: `🔒 grounded`. Per-run override i
 ```
 home screen
 └─ [Open folder…]   → native folder picker → daemon resolves realpath
-                    → adds to ~/.open-make/recent-projects.json
+                    → adds to ~/.open-maker/recent-projects.json
                     → enters project view rooted at that folder
 ```
 
@@ -260,14 +260,14 @@ od open ./my-pitch            # add to recent and open in UI (no project.json wr
 
 ### Recent projects
 
-`~/.open-make/recent-projects.json`:
+`~/.open-maker/recent-projects.json`:
 
 ```json
 {
   "version": 1,
   "entries": [
     { "path": "/Users/me/Documents/foo", "lastOpenedAt": "2026-05-10T11:00:00Z" },
-    { "path": "/Users/me/code/open-make", "lastOpenedAt": "2026-05-09T20:14:11Z" }
+    { "path": "/Users/me/code/open-maker", "lastOpenedAt": "2026-05-09T20:14:11Z" }
   ]
 }
 ```
@@ -284,12 +284,12 @@ This file is the **only** cross-project state the daemon maintains. Stale entrie
 | `POST /api/projects/:project/facets` | New | Body: `{ mode, skill, brief, parameters? }` → 201 with facet manifest |
 | `POST /api/projects/:project/facets/:facet/regen` | New | Body: `{ brief?, parameters?, keepContent? }` |
 | `DELETE /api/projects/:project/facets/:facet` | New | Soft-deletes to `.od/trash/<facet-id>/` |
-| `GET /api/projects/recent` | New | Reads `~/.open-make/recent-projects.json` |
+| `GET /api/projects/recent` | New | Reads `~/.open-maker/recent-projects.json` |
 | `POST /api/chat` | Updated | Required `projectPath` parameter; rejected without it |
 
 `:project` route segments take a URL-encoded `realpath`. The daemon canonicalizes via the same `resolveSafe` rules as today's folder import (refuse `RUNTIME_DATA_DIR` paths).
 
-Shared DTOs added to `@open-make/contracts`:
+Shared DTOs added to `@open-maker/contracts`:
 
 - `ProjectRef { path, name?, lastOpenedAt? }`
 - `FacetRef`, `FacetManifest`
@@ -319,7 +319,7 @@ Land this draft. Patch `spec.md`, `architecture.md`, `modes.md`, `skills-protoco
 
 **Phase 2 — Implementation (single landing, no coexistence with the old model).**
 - Remove UUID-creating endpoints and `.od/projects/<uuid>/` write paths from `apps/daemon` in the same change set that introduces the new model. No deprecation period; no migration tooling.
-- `apps/daemon`: project registry keyed by realpath, facet store, source resolver, ToC indexer, sibling-facet summarizer, recent-projects file at `~/.open-make/recent-projects.json`.
+- `apps/daemon`: project registry keyed by realpath, facet store, source resolver, ToC indexer, sibling-facet summarizer, recent-projects file at `~/.open-maker/recent-projects.json`.
 - `apps/web`: project chooser screen, project view (sources panel + facet grid), facet add/regen UI.
 - `packages/contracts`: new DTOs replace the old project/import shapes outright.
 - Tests: `e2e` adds open-folder + facet add/regen scenarios; remove any UUID-project tests.
@@ -369,17 +369,17 @@ These patches land **after** this RFC is accepted; not in this PR.
 
 ## Appendix A — Worked example: this repository as a project
 
-After this RFC ships, opening `/Users/<you>/code/open-make/` in OD does the following:
+After this RFC ships, opening `/Users/<you>/code/open-maker/` in OD does the following:
 
-1. `POST /api/projects/open { path: "/Users/<you>/code/open-make" }`.
+1. `POST /api/projects/open { path: "/Users/<you>/code/open-maker" }`.
 2. Daemon resolves realpath, adds to recent-projects, enters project view.
 3. Default source detection finds `docs/` → registers as the active source dir.
 4. No `DESIGN.md` at project root → brand axis empty (skills that require it are greyed).
 5. No `KNOWLEDGE.md` → project intent block omitted from compose.
 6. No `artifacts/` yet → facet grid empty; chat panel shows "Generate your first facet".
-7. User types: *"a SaaS-landing prototype that explains Open Make to indie developers, hero pulls from spec.md."*
+7. User types: *"a SaaS-landing prototype that explains Open Maker to indie developers, hero pulls from spec.md."*
 8. OD picks `saas-landing` skill (mode: prototype). Compose includes craft + ToC of `docs/` + sibling facets summary (empty) + skill body + brief.
-9. Agent runs with `cwd = /Users/<you>/code/open-make`, reads `docs/spec.md` and `docs/skills-protocol.md`, writes to `artifacts/prototype-landing/index.html`.
+9. Agent runs with `cwd = /Users/<you>/code/open-maker`, reads `docs/spec.md` and `docs/skills-protocol.md`, writes to `artifacts/prototype-landing/index.html`.
 10. Facet grid now shows one card. Subsequent `deck-investor` facet generation receives the prototype's brief in its sibling summary and stays consistent in headline/voice.
 
 No daemon data lives outside `<project-root>/.od/`. The repo itself is a working OD project.

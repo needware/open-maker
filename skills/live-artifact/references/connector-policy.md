@@ -70,7 +70,7 @@ Connector-backed live artifact refresh is allowed only for tools that remain rea
 {
   "type": "connector_tool",
   "toolName": "github.public_repo_summary",
-  "input": { "owner": "open-make", "repo": "open-make" },
+  "input": { "owner": "open-maker", "repo": "open-maker" },
   "connector": {
     "connectorId": "github_public",
     "accountLabel": "public",

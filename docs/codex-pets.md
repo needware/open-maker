@@ -2,7 +2,7 @@
 
 The pet companion in the web app can adopt pets packaged by the upstream
 Codex `hatch-pet` skill. This doc explains where those pets live, how
-Open Make discovers them, and what to do if you do not have Codex
+Open Maker discovers them, and what to do if you do not have Codex
 installed.
 
 ## Where pets live
@@ -27,7 +27,7 @@ panel calls these endpoints from
 
 ## I do not have Codex installed
 
-You do not need Codex to use Open Make. The pet companion ships with
+You do not need Codex to use Open Maker. The pet companion ships with
 built-in pets that work out of the box. The "Recently hatched" section
 will simply stay empty until something appears under
 `${CODEX_HOME:-$HOME/.codex}/pets/`.

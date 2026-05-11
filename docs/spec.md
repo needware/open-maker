@@ -1,4 +1,4 @@
-# Open Make — Product Spec
+# Open Maker — Product Spec
 
 **Status:** Draft v0.1 · 2026-04-24
 **Scope:** Product definition, scenarios, non-goals, high-level modules, and positioning against both [Anthropic's Claude Design][cd] and the existing open-source alternative ([Open CoDesign][ocod]).
@@ -61,7 +61,7 @@ User picks "SaaS landing — Stripe-ish" from the gallery. Template is a pre-fil
 User uploads a screenshot, brand guide PDF, or Figma link. OD runs `design-system-skill` which produces a `DESIGN.md` at the project root following the 9-section format. From this point on every subsequent facet (prototype, deck, template) in the project picks up the tokens automatically.
 
 ### S5 — "Generate from my docs"
-User opens a folder that already contains a `docs/` subdirectory (or any of `sources/`, `content/`, `knowledge/`, `wiki/`). OD detects it as the project's source automatically and surfaces a `📚 docs-driven` chip in the run header. Subsequent prototype / deck / template generations read the source ToC plus targeted files via the agent's `Read` tool, keep facts and product names anchored to the docs, and (when the active skill or any source declares `ground: true`) refuse to invent claims not present in sources. The open-make repository itself is a working example: open this repo as a project, and `docs/` is the source out of the box.
+User opens a folder that already contains a `docs/` subdirectory (or any of `sources/`, `content/`, `knowledge/`, `wiki/`). OD detects it as the project's source automatically and surfaces a `📚 docs-driven` chip in the run header. Subsequent prototype / deck / template generations read the source ToC plus targeted files via the agent's `Read` tool, keep facts and product names anchored to the docs, and (when the active skill or any source declares `ground: true`) refuse to invent claims not present in sources. The open-maker repository itself is a working example: open this repo as a project, and `docs/` is the source out of the box.
 
 Scenarios S1–S4 map onto the four modes in [`modes.md`](modes.md). S5 is not a fifth mode — it's any of the four modes running inside a project that has sources.
 

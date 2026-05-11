@@ -868,7 +868,10 @@ function SidebarHero({
         onClick={onOpenPicker}
         data-testid="sidebar-hero-pick"
         style={{
+          display: 'inline-flex',
+          alignItems: 'center',
           justifyContent: 'center',
+          gap: 8,
           padding: '10px 14px',
           fontWeight: 600,
           fontSize: 13,

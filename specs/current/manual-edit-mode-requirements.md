@@ -1,8 +1,8 @@
-# Open Make Manual Edit Mode Requirements
+# Open Maker Manual Edit Mode Requirements
 
 ## Purpose
 
-This document records the accepted manual edit-mode model from `apps/edit-mode-demo` so it can be migrated into the main Open Make web app.
+This document records the accepted manual edit-mode model from `apps/edit-mode-demo` so it can be migrated into the main Open Maker web app.
 
 The key product decision is:
 
@@ -95,7 +95,7 @@ Purpose: live artifact preview.
 Required behavior:
 
 - Render artifact in sandboxed iframe.
-- Preserve Open Make's existing preview model.
+- Preserve Open Maker's existing preview model.
 - In edit mode, selectable elements show subtle outlines.
 - Hovered/selectable elements should feel discoverable without overwhelming the artifact.
 - Center toolbar includes:
@@ -411,7 +411,7 @@ The accepted design direction:
   - left layers
   - center canvas
   - right properties modal
-- Open Make-specific mode rail:
+- Open Maker-specific mode rail:
   - Preview
   - Edit
   - Comment AI
@@ -443,7 +443,7 @@ Likely production destinations:
 - `apps/web/src/components/FileViewer.tsx`
 - `apps/web/src/index.css`
 
-Existing Open Make integration points:
+Existing Open Maker integration points:
 
 - `FileViewer` already owns preview iframe and mode toolbar.
 - Existing comment mode already injects a preview bridge.

@@ -17,7 +17,7 @@ Follow the root `AGENTS.md` and `apps/AGENTS.md` first. This app owns only the p
 
 ## Rules
 
-- Consume `@open-make/sidecar-proto`, `@open-make/sidecar`, and `@open-make/platform` primitives; do not hand-build stamp flags or process matching logic.
+- Consume `@open-maker/sidecar-proto`, `@open-maker/sidecar`, and `@open-maker/platform` primitives; do not hand-build stamp flags or process matching logic.
 - Keep data/log/runtime/cache paths namespace-scoped and independent from daemon/web ports.
 - Keep Next.js packaged runtime as SSR/web-sidecar-owned; do not put Next output under `OD_RESOURCE_ROOT`.
 - `OD_RESOURCE_ROOT` is only for daemon non-Next read-only resources: `skills/`, `design-systems/`, and `frames/`.

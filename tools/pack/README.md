@@ -1,6 +1,6 @@
 # tools/pack
 
-Local packaging control plane for Open Make.
+Local packaging control plane for Open Maker.
 
 The active slice is mac-first local packaging and smoke lifecycle control:
 
@@ -16,8 +16,8 @@ The active slice is mac-first local packaging and smoke lifecycle control:
 - `tools-pack mac cleanup`
 
 Build artifacts are namespace-scoped under `.tmp/tools-pack/out/mac/namespaces/<namespace>/`.
-Release artifacts keep the canonical `Open Make.app` bundle shape; local `tools-pack install` copies it as
-`Open Make.<namespace>.app` so developer namespaces can coexist without affecting runtime data/log/cache paths.
+Release artifacts keep the canonical `Open Maker.app` bundle shape; local `tools-pack install` copies it as
+`Open Maker.<namespace>.app` so developer namespaces can coexist without affecting runtime data/log/cache paths.
 
 Packaged runtime state is namespace-scoped under `.tmp/tools-pack/runtime/mac/namespaces/<namespace>/`:
 
@@ -104,8 +104,8 @@ Build artifacts are namespace-scoped under `.tmp/tools-pack/out/linux/namespaces
 Local installs use XDG paths:
 
 - AppImage: `~/.local/bin/Open-Design.<namespace>.AppImage`
-- Menu entry: `~/.local/share/applications/open-make-<namespace>.desktop`
-- Icon: `~/.local/share/icons/hicolor/512x512/apps/open-make-<namespace>.png`
+- Menu entry: `~/.local/share/applications/open-maker-<namespace>.desktop`
+- Icon: `~/.local/share/icons/hicolor/512x512/apps/open-maker-<namespace>.png`
 
 The `<namespace>` suffix is unconditional so multiple developer namespaces can coexist on the same desktop. The `.desktop` file registers the `od://` scheme via `MimeType=x-scheme-handler/od;` and pre-sets `OD_PACKAGED_NAMESPACE` on the `Exec=` line so menu launches identify the correct namespace.
 
@@ -113,9 +113,9 @@ The `<namespace>` suffix is unconditional so multiple developer namespaces can c
 
 Headless mode targets environments without a display (WSL2, headless servers, CI) where Electron can't run. If you have a desktop, use the AppImage; if you're SSH'd into a machine or in WSL, use headless.
 
-`--headless` makes `install`, `start`, and `stop` operate on the headless entry (`@open-make/packaged/dist/headless.mjs`) instead of the AppImage. Headless mode runs daemon + web without Electron.
+`--headless` makes `install`, `start`, and `stop` operate on the headless entry (`@open-maker/packaged/dist/headless.mjs`) instead of the AppImage. Headless mode runs daemon + web without Electron.
 
-- `install --headless` writes a shell launcher at `~/.local/bin/open-make-headless-<namespace>` that bakes in the namespace and resource paths. The launcher is self-contained, but the assembled app directory at those paths must remain in place — don't move it after install.
+- `install --headless` writes a shell launcher at `~/.local/bin/open-maker-headless-<namespace>` that bakes in the namespace and resource paths. The launcher is self-contained, but the assembled app directory at those paths must remain in place — don't move it after install.
 - `start --headless` spawns the headless process directly, redirects stdout/stderr to `logs/desktop/latest.log`, and waits up to 95s (35s for identity marker + 60s for web URL) before returning.
 - `stop --headless` reads the same `runtime/desktop-root.json` identity marker as the AppImage path, validates `stamp.source === PACKAGED`, sends a graceful SHUTDOWN over IPC, then terminates the process tree. It does not perform the AppImage-specific process-command check.
 

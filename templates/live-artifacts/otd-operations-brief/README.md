@@ -6,9 +6,9 @@
 
 A drop-in `html_template_v1` live-artifact template for an editorial On-Time Delivery brief. It ships:
 
-- a tokenized HTML template (`template.html`) wired entirely with Open Make's scalar-only `{{data.X}}` bindings;
+- a tokenized HTML template (`template.html`) wired entirely with Open Maker's scalar-only `{{data.X}}` bindings;
 - a default sample `data.json` covering a 14-account month-over-month OTD slice plus a "lowest 8" deep-dive;
-- the canonical `artifact.json` and `provenance.json` shapes the Open Make daemon expects;
+- the canonical `artifact.json` and `provenance.json` shapes the Open Maker daemon expects;
 - a pre-rendered `index.html` and `preview.png` so reviewers can see the artifact without spinning up a daemon.
 
 ## Files
@@ -29,7 +29,7 @@ templates/live-artifacts/otd-operations-brief/
 
 ## How it binds
 
-Open Make's `html_template_v1` renderer is intentionally narrow:
+Open Maker's `html_template_v1` renderer is intentionally narrow:
 
 - only `{{data.path.to.value}}` interpolation, paths must start with `data`;
 - bindings must resolve to scalars (no array or object values);
@@ -70,4 +70,4 @@ The `live-artifact` skill (see `skills/live-artifact/SKILL.md`) is the recommend
 
 ## Source attribution
 
-Original visual reference: a 1200 × 960 OTD operations dashboard image extracted into `DESIGN.md` via the open-make 9-section spec. Sample account names, month, currency, and percentages are fictional and intentionally illustrative; do not treat them as ground truth.
+Original visual reference: a 1200 × 960 OTD operations dashboard image extracted into `DESIGN.md` via the open-maker 9-section spec. Sample account names, month, currency, and percentages are fictional and intentionally illustrative; do not treat them as ground truth.

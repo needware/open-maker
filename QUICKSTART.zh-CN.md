@@ -68,8 +68,8 @@ pnpm tools-dev status          # 检查托管的 runtime 状态
 pnpm tools-dev logs            # 查看 daemon / web / desktop 日志
 pnpm tools-dev check           # 查看 status + 最近日志 + 常见诊断
 pnpm tools-dev stop            # 停止托管 runtime
-pnpm --filter @open-make/daemon build  # 构建 apps/daemon/dist/cli.js，供 `od` 使用
-pnpm --filter @open-make/web build     # 在需要时构建 web package
+pnpm --filter @open-maker/daemon build  # 构建 apps/daemon/dist/cli.js，供 `od` 使用
+pnpm --filter @open-maker/web build     # 在需要时构建 web package
 pnpm typecheck                 # 对整个 workspace 执行 typecheck
 ```
 
@@ -89,13 +89,13 @@ Image、video、audio、HyperFrames 等 skill 在通过 daemon 启动 agent 时�
 若媒体生成报错 `OD_BIN: parameter not set`、提示找不到 `apps/daemon/dist/cli.js`、或出现 `failed to reach daemon at http://127.0.0.1:0`，请重新构建 daemon CLI 并重启托管 runtime：
 
 ```bash
-pnpm --filter @open-make/daemon build
+pnpm --filter @open-maker/daemon build
 pnpm tools-dev restart --daemon-port 7457 --web-port 5175
 ls -la apps/daemon/dist/cli.js
 curl -s http://127.0.0.1:7457/api/health
 ```
 
-随后，在 Open Make 应用中**重新打开**该 project，不要复用之前 terminal 中的 agent 会话。由 daemon 启动的 agent 应当能够看到类似如下的值：
+随后，在 Open Maker 应用中**重新打开**该 project，不要复用之前 terminal 中的 agent 会话。由 daemon 启动的 agent 应当能够看到类似如下的值：
 
 ```bash
 echo "OD_BIN=$OD_BIN"
@@ -154,7 +154,7 @@ BASE_SYSTEM_PROMPT   （输出契约：用 <artifact> 包裹，不使用 code fe
 ## 文件结构
 
 ```
-open-make/
+open-maker/
 ├── apps/
 │   ├── daemon/                # Node/Express —— 启动本地 agent + 提供 API
 │   │   └── src/
@@ -179,7 +179,7 @@ open-make/
 │   └── desktop/               # Electron runtime，由 tools-dev 启动 / 检查
 ├── packages/
 │   ├── contracts/             # 共享的 web/daemon 应用契约
-│   ├── sidecar-proto/         # Open Make sidecar 协议契约
+│   ├── sidecar-proto/         # Open Maker sidecar 协议契约
 │   ├── sidecar/               # 通用 sidecar runtime 原语
 │   └── platform/              # 通用 process/platform 原语
 ├── tools/dev/                 # `pnpm tools-dev` 生命周期与 inspect CLI
@@ -216,8 +216,8 @@ open-make/
 
 - **"no agents found on PATH"** —— 安装以下 CLI 之一：`claude`、`codex`、`devin`、`gemini`、`opencode`、`cursor-agent`、`qwen`、`qodercli`、`copilot`。或者在 Settings 中切换至 API mode，填入 provider key。
 - **daemon 在 /api/chat 上返回 500** —— 查看 daemon 终端的 stderr 尾部；通常是 CLI 拒绝了传入的参数。不同 CLI 的 argv 结构各异；如需调整，请参阅 `apps/daemon/src/agents.ts` 中的 `buildArgs`。
-- **媒体生成报错 `OD_BIN` 缺失、或 daemon URL 为 `:0`** —— 运行上述媒体 dispatcher 排查步骤。请勿复用已有的 CLI 会话；从 Open Make 应用中重新打开 project，daemon 才会注入新的 `OD_*` 变量。
-- **Codex 加载的插件上下文过多** —— 使用 `OD_CODEX_DISABLE_PLUGINS=1 pnpm tools-dev` 启动 Open Make，daemon 启动 Codex 时会传入 `--disable plugins`。
+- **媒体生成报错 `OD_BIN` 缺失、或 daemon URL 为 `:0`** —— 运行上述媒体 dispatcher 排查步骤。请勿复用已有的 CLI 会话；从 Open Maker 应用中重新打开 project，daemon 才会注入新的 `OD_*` 变量。
+- **Codex 加载的插件上下文过多** —— 使用 `OD_CODEX_DISABLE_PLUGINS=1 pnpm tools-dev` 启动 Open Maker，daemon 启动 Codex 时会传入 `--disable plugins`。
 - **artifact 始终不渲染** —— 模型输出了文本但未使用 `<artifact>` 包裹。请确认 system prompt 已正确传递（查看 daemon 日志），然后考虑更换能力更强的模型或更严格的 skill。
 
 ## 回到产品愿景

@@ -191,7 +191,7 @@ Rationale:
 - **Sessions separate from artifacts** → sessions are ephemeral UI state in `.od/sessions/`; artifacts are durable user content in `artifacts/`.
 - **Source ToC cached, not authoritative** → cache lives in `.od/cache/sources/<id>/toc.json`; sources on disk are the single source of truth, mtime invalidates the cache.
 
-The daemon's only cross-project state is `~/.open-make/recent-projects.json` (a list of opened-folder paths and timestamps; not a context source — see invariant #4 in the RFC). Project records elsewhere (DB rows, UUID dirs, virtual workspaces) are not maintained.
+The daemon's only cross-project state is `~/.open-maker/recent-projects.json` (a list of opened-folder paths and timestamps; not a context source — see invariant #4 in the RFC). Project records elsewhere (DB rows, UUID dirs, virtual workspaces) are not maintained.
 
 ### 3.7 Export pipeline
 
@@ -265,8 +265,8 @@ The daemon's only cross-project state is `~/.open-make/recent-projects.json` (a 
 
 | File | Purpose |
 |---|---|
-| `~/.open-make/config.toml` | daemon-global: default agent preference, keys (optional, BYOK), telemetry opt-in (default off) |
-| `~/.open-make/agents.json` | cached agent detection results |
+| `~/.open-maker/config.toml` | daemon-global: default agent preference, keys (optional, BYOK), telemetry opt-in (default off) |
+| `~/.open-maker/agents.json` | cached agent detection results |
 | `./.od/config.json` | project-local: active design system, preferred skills, preferred mode |
 | `./skills/<skill>/SKILL.md` | skill manifest (standard Claude Code format) |
 | `./DESIGN.md` | active design system ([awesome-claude-design][acd] format) |
@@ -302,7 +302,7 @@ POST   /api/artifacts/save                                   # writes inside the
 
 `POST /api/projects/open` takes `{ path: string }`. The daemon canonicalizes
 via `realpath()`, refuses paths inside `RUNTIME_DATA_DIR`, adds the entry to
-`~/.open-make/recent-projects.json`, and returns a `ProjectRef`. Opening
+`~/.open-maker/recent-projects.json`, and returns a `ProjectRef`. Opening
 the same realpath twice is a no-op.
 
 There is no separate `POST /api/import/folder`. There is no UUID-keyed
@@ -327,7 +327,7 @@ Safety on every project-scoped write:
 Request / response types: `ProjectRef`, `OpenProjectRequest`,
 `OpenProjectResponse`, `FacetRef`, `FacetManifest`,
 `CreateFacetRequest`, `CreateFacetResponse`, `SourceDirRef`, `SourceToc`
-in `@open-make/contracts`.
+in `@open-maker/contracts`.
 
 Shared API contract types live in [`packages/contracts/src`](../packages/contracts/src).
 
@@ -347,7 +347,7 @@ When a reverse proxy sits in front of the daemon, `/api/*` includes SSE streams 
 services:
   daemon:
     image: openclaudedesign/daemon
-    volumes: [ "~/.open-make:/root/.open-make", "./:/workspace" ]
+    volumes: [ "~/.open-maker:/root/.open-maker", "./:/workspace" ]
     ports: ["7456:7456"]
   web:
     image: openclaudedesign/web

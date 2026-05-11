@@ -8,7 +8,7 @@ Implementation branch: `codex/manual-edit-mode`.
 
 ## Goal
 
-Migrate the accepted manual edit-mode prototype into the production Open Make web app.
+Migrate the accepted manual edit-mode prototype into the production Open Maker web app.
 
 The product boundary is fixed:
 
@@ -41,9 +41,9 @@ The product boundary is fixed:
 ## Verification Commands
 
 ```bash
-pnpm --filter @open-make/web typecheck
-pnpm --filter @open-make/web test
-pnpm --filter @open-make/e2e test:ui -- --grep "manual edit"
+pnpm --filter @open-maker/web typecheck
+pnpm --filter @open-maker/web test
+pnpm --filter @open-maker/e2e test:ui -- --grep "manual edit"
 pnpm typecheck
 pnpm test
 pnpm check:residual-js
