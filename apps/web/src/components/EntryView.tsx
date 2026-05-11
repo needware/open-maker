@@ -662,7 +662,7 @@ function TopTabButton({
 /**
  * Project-switcher trigger — a header chip ("Home ▾" on the home view,
  * project name when one is open) that toggles a Cursor-style popover
- * containing the recents list + Open Folder action. Lifted out of the
+ * containing the recents list + Set Up Workspace action. Lifted out of the
  * sidebar so the project switcher works the same way on the home screen
  * and inside a project (slice 5 will reuse this trigger in the project
  * shell's chrome).
@@ -822,7 +822,7 @@ function ProjectSwitcherTrigger({
  * folder picker. Still useful: gives the empty homepage a focal point
  * and a one-click escape route from "what do I do here?".
  *
- * The "Open Folder…" button prefers the native Electron picker when
+ * The "Set Up Workspace" button prefers the native Electron picker when
  * available (better UX on macOS/Windows) and falls back to the
  * in-app `FolderPickerDialog` otherwise (browser dev / headless tests
  * / Linux distros without a system dialog). The fallback dialog talks
@@ -878,7 +878,7 @@ function SidebarHero({
         }}
       >
         <Icon name="folder" size={14} />
-        <span>Open Folder…</span>
+        <span>Set Up Workspace</span>
       </button>
 
       <p
@@ -898,7 +898,7 @@ function SidebarHero({
 
 /**
  * Popover-content version of the project switcher. Renders the search
- * input, "Recents" list, and bottom Open Folder action — exactly the
+ * input, "Recents" list, and bottom Set Up Workspace action — exactly the
  * three groups in Cursor's reference popover (`docs/.../image-…png`).
  *
  * The search input is also the manual-path fallback: when the typed text
@@ -1064,7 +1064,7 @@ function ProjectSwitcherPanel({
         }}
       >
         <SwitcherRow
-          label={busy ? 'Opening…' : 'Open Folder…'}
+          label={busy ? 'Opening…' : 'Set Up Workspace'}
           onClick={hasElectronPicker ? handlePick : (onOpenPicker ?? (() => {}))}
           testId="project-switcher-pick"
           disabled={busy || (!hasElectronPicker && !onOpenPicker)}
