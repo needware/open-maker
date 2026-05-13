@@ -132,23 +132,27 @@ export function FacetSetupPopover({
   // above/below the composer; the inner panel scrolls when content
   // overflows.
   const PANEL_W = 560;
-  const PANEL_MAX_H = useMemo(
-    () => Math.min(typeof window === 'undefined' ? 720 : window.innerHeight - 80, 720),
-    [],
-  );
+
+  // The chip lives in the composer near the bottom of the viewport, so
+  // we want the popover to open *upward* whenever the space above is
+  // larger than below. We size `maxHeight` to whichever side we pick so
+  // the panel never clips off-screen — earlier the height was a fixed
+  // 720 and only the position flipped, which made a short space-above
+  // wrongly fall back to "below" and overflow the viewport.
+  const viewportH = typeof window === 'undefined' ? 720 : window.innerHeight;
+  const viewportW = typeof window === 'undefined' ? 1024 : window.innerWidth;
+  const GAP = 8;
+  const MARGIN = 8;
+  const spaceAbove = Math.max(0, anchorRect.top - GAP - MARGIN);
+  const spaceBelow = Math.max(0, viewportH - anchorRect.bottom - GAP - MARGIN);
+  const placeAbove = spaceAbove >= spaceBelow;
+  const PANEL_MAX_H = Math.min(720, placeAbove ? spaceAbove : spaceBelow);
 
   const left = useMemo(
-    () =>
-      Math.max(
-        8,
-        Math.min(anchorRect.left, (typeof window === 'undefined' ? 1024 : window.innerWidth) - PANEL_W - 8),
-      ),
-    [anchorRect.left],
+    () => Math.max(MARGIN, Math.min(anchorRect.left, viewportW - PANEL_W - MARGIN)),
+    [anchorRect.left, viewportW],
   );
-  const aboveTop = anchorRect.top - PANEL_MAX_H - 8;
-  const belowTop = anchorRect.bottom + 8;
-  const placeAbove = aboveTop >= 8;
-  const top = placeAbove ? aboveTop : belowTop;
+  const top = placeAbove ? anchorRect.top - PANEL_MAX_H - GAP : anchorRect.bottom + GAP;
 
   return (
     <div

@@ -251,19 +251,18 @@ interface Props {
   onOpenConnectorsTab?: () => void;
 }
 
+// Tab labels reuse the existing `newproj.surface*` keys for the three
+// media tabs ("Image" / "Video" / "Audio") so we don't need to fan out
+// a new `newproj.tab{Image,Video,Audio}` triple into every locale file.
 const TAB_LABEL_KEYS: Record<CreateTab, keyof Dict> = {
   prototype: 'newproj.tabPrototype',
   'live-artifact': 'newproj.tabLiveArtifact',
   deck: 'newproj.tabDeck',
   template: 'newproj.tabTemplate',
-  media: 'newproj.tabMedia',
-  other: 'newproj.tabOther',
-};
-
-const MEDIA_SURFACE_LABEL_KEYS: Record<MediaSurface, keyof Dict> = {
   image: 'newproj.surfaceImage',
   video: 'newproj.surfaceVideo',
   audio: 'newproj.surfaceAudio',
+  other: 'newproj.tabOther',
 };
 
 export function defaultDesignSystemSelection(
@@ -401,6 +400,39 @@ export function FacetParametersPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptTemplates]);
 
+  // Picking an image/video prompt template can also propose a default
+  // model + aspect — apply them when the template's model is one of the
+  // installed providers, otherwise leave the existing pick alone so the
+  // user can switch templates without losing their selected model.
+  function handleImagePromptTemplate(pick: PromptTemplatePick | null) {
+    setImagePromptTemplate(pick);
+    const m = pick?.summary.model;
+    if (m && IMAGE_MODELS.some((x) => x.id === m)) setImageModel(m);
+    const a = pick?.summary.aspect;
+    if (a && (MEDIA_ASPECTS as readonly string[]).includes(a)) {
+      setImageAspect(a as MediaAspect);
+    }
+  }
+  function handleVideoPromptTemplate(pick: PromptTemplatePick | null) {
+    setVideoPromptTemplate(pick);
+    const m = pick?.summary.model;
+    if (m && VIDEO_MODELS.some((x) => x.id === m)) {
+      setVideoModel(m);
+    }
+    const a = pick?.summary.aspect;
+    if (a && (MEDIA_ASPECTS as readonly string[]).includes(a)) {
+      setVideoAspect(a as MediaAspect);
+    }
+  }
+  // Thin wrapper over setVideoModel. The original (PR #1304) also flipped
+  // a `videoModelTouched` flag so a downstream effect could auto-default
+  // the model on tab/skill changes; that effect didn't survive the
+  // FacetParametersPanel rewrite, so until it's re-introduced the touched
+  // tracking is dead and we just forward straight to the setter.
+  function handleVideoModel(id: string) {
+    setVideoModel(id);
+  }
+
   // Design system is meaningful only for the structured/visual surfaces
   // (prototype, deck, template, and the freeform "other" canvas). The
   // media surfaces use prompt templates instead — design tokens don't map
@@ -524,20 +556,14 @@ export function FacetParametersPanel({
     const { primary: primaryDs, inspirations } =
       buildDesignSystemCreateSelection(showDesignSystemPicker, selectedDsIds);
     const promptTemplatePick =
-      tab === 'media'
-        ? mediaSurface === 'image'
-          ? imagePromptTemplate
-          : mediaSurface === 'video'
-            ? videoPromptTemplate
-            : null
-        : null;
+      tab === 'image'
+        ? imagePromptTemplate
+        : tab === 'video'
+          ? videoPromptTemplate
+          : null;
     const metadata = buildMetadata({
       tab,
-      mediaSurface,
       fidelity,
-      platformTargets,
-      includeLandingPage,
-      includeOsWidgets,
       speakerNotes,
       animations,
       templateId,
@@ -631,7 +657,7 @@ export function FacetParametersPanel({
       </div>
       <div className="newproj-body">
         <h3 className="newproj-title">
-          <span className="newproj-title-text">{titleForTab(tab, mediaSurface, t)}</span>
+          <span className="newproj-title-text">{titleForTab(tab, t)}</span>
           {tab === 'live-artifact' ? (
             // "Beta" is an internationally adopted brand-style status marker;
             // intentionally not run through t() (consistent with short product
@@ -652,29 +678,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'media' ? (
-          <div
-            className="newproj-media-segmented"
-            role="tablist"
-            aria-label={t('newproj.tabMedia')}
-          >
-            {(Object.keys(MEDIA_SURFACE_LABEL_KEYS) as MediaSurface[]).map((surface) => (
-              <button
-                key={surface}
-                type="button"
-                role="tab"
-                data-testid={`new-project-media-surface-${surface}`}
-                aria-selected={mediaSurface === surface}
-                className={`newproj-media-surface ${mediaSurface === surface ? 'active' : ''}`}
-                onClick={() => setMediaSurface(surface)}
-              >
-                {t(MEDIA_SURFACE_LABEL_KEYS[surface])}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {tab === 'media' && mediaSurface === 'image' ? (
+        {tab === 'image' ? (
           <PromptTemplatePicker
             surface="image"
             templates={promptTemplates}
@@ -683,7 +687,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'media' && mediaSurface === 'video' ? (
+        {tab === 'video' ? (
           <PromptTemplatePicker
             surface="video"
             templates={promptTemplates}
@@ -692,19 +696,11 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'prototype' || tab === 'live-artifact' || tab === 'template' || tab === 'other' ? (
-          <PlatformPicker value={platformTargets} onChange={setPlatformTargets} />
-        ) : null}
-
-        {tab === 'prototype' || tab === 'live-artifact' || tab === 'template' || tab === 'other' ? (
-          <SurfaceOptions
-            includeLandingPage={includeLandingPage}
-            includeOsWidgets={includeOsWidgets}
-            osWidgetsAvailable={platformTargetsSupportOsWidgets(platformTargets)}
-            onIncludeLandingPage={setIncludeLandingPage}
-            onIncludeOsWidgets={setIncludeOsWidgets}
-          />
-        ) : null}
+        {/* Platform-targets + surface-options pickers were removed when the
+            old NewProjectPanel was retired; they relied on PlatformPicker /
+            SurfaceOptions / DESIGN_PLATFORMS that never got ported into
+            FacetParametersPanel. Re-introduce when the responsive-handoff
+            feature (PR #1224) gets re-implemented on the new panel surface. */}
 
         {/* Live artifact always renders at high fidelity — its whole point
             is data-bound polished UI, so the wireframe option is hidden. */}
@@ -746,7 +742,7 @@ export function FacetParametersPanel({
           </>
         ) : null}
 
-        {tab === 'media' && mediaSurface === 'image' ? (
+        {tab === 'image' ? (
           <MediaProjectOptions
             surface="image"
             imageModel={imageModel}
@@ -757,7 +753,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'media' && mediaSurface === 'video' ? (
+        {tab === 'video' ? (
           <MediaProjectOptions
             surface="video"
             videoModel={videoModel}
@@ -770,7 +766,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'media' && mediaSurface === 'audio' ? (
+        {tab === 'audio' ? (
           <MediaProjectOptions
             surface="audio"
             audioKind={audioKind}
@@ -2191,11 +2187,7 @@ function OptionCards<T extends string | number>({
 
 function buildMetadata(input: {
   tab: CreateTab;
-  mediaSurface: MediaSurface;
   fidelity: 'wireframe' | 'high-fidelity';
-  platformTargets: NewProjectPlatform[];
-  includeLandingPage: boolean;
-  includeOsWidgets: boolean;
   speakerNotes: boolean;
   animations: boolean;
   templateId: string | null;
@@ -2212,24 +2204,17 @@ function buildMetadata(input: {
   inspirationIds: string[];
   promptTemplate: PromptTemplatePick | null;
 }): ProjectMetadata {
+  // `kind` and `tab` agree for every CreateTab except `live-artifact`,
+  // which records `kind: 'prototype'` + an `intent: 'live-artifact'`
+  // marker so downstream consumers that only branch on kind keep working.
   const kind: ProjectKind =
-    input.tab === 'live-artifact'
-      ? 'prototype'
-      : input.tab === 'media'
-        ? input.mediaSurface
-        : input.tab;
-  const selectedPlatforms = normalizeSelectedPlatforms(input.platformTargets);
-  const concreteTargets = platformTargetsFor(selectedPlatforms);
-  const canIncludeOsWidgets = platformTargetsSupportOsWidgets(concreteTargets);
-  const surfaceOptions = {
-    ...(input.includeLandingPage ? { includeLandingPage: true } : {}),
-    ...(input.includeOsWidgets && canIncludeOsWidgets ? { includeOsWidgets: true } : {}),
-  };
-  const base = {
-    platform: selectedPlatforms[0],
-    platformTargets: concreteTargets,
-    ...surfaceOptions,
-  };
+    input.tab === 'live-artifact' ? 'prototype' : input.tab;
+  // `base` previously carried platform / platformTargets / landingPage /
+  // osWidgets from the platform picker; those fields were dropped along
+  // with the PlatformPicker/SurfaceOptions removal above and consumers
+  // (ProjectView header chips) already read them through optional chaining,
+  // so absence is benign. Restore when PR #1224's feature is re-ported.
+  const base = {};
   const inspirations = input.inspirationIds.length > 0
     ? { inspirationDesignSystemIds: input.inspirationIds }
     : {};
@@ -2263,26 +2248,26 @@ function buildMetadata(input: {
       ...inspirations,
     };
   }
-  if (input.tab === 'media') {
-    if (input.mediaSurface === 'image') {
-      return {
-        kind,
-        imageModel: input.imageModel,
-        imageAspect: input.imageAspect,
-        ...buildPromptTemplateMetadata(input.promptTemplate),
-        ...inspirations,
-      };
-    }
-    if (input.mediaSurface === 'video') {
-      return {
-        kind,
-        videoModel: input.videoModel,
-        videoAspect: input.videoAspect,
-        videoLength: input.videoLength,
-        ...buildPromptTemplateMetadata(input.promptTemplate),
-        ...inspirations,
-      };
-    }
+  if (input.tab === 'image') {
+    return {
+      kind,
+      imageModel: input.imageModel,
+      imageAspect: input.imageAspect,
+      ...buildPromptTemplateMetadata(input.promptTemplate),
+      ...inspirations,
+    };
+  }
+  if (input.tab === 'video') {
+    return {
+      kind,
+      videoModel: input.videoModel,
+      videoAspect: input.videoAspect,
+      videoLength: input.videoLength,
+      ...buildPromptTemplateMetadata(input.promptTemplate),
+      ...inspirations,
+    };
+  }
+  if (input.tab === 'audio') {
     return {
       kind,
       audioKind: input.audioKind,
@@ -2293,55 +2278,6 @@ function buildMetadata(input: {
     };
   }
   return { kind: 'other', ...base, ...inspirations };
-}
-
-function normalizeSelectedPlatforms(platforms: NewProjectPlatform[]): NewProjectPlatform[] {
-  const seen = new Set<NewProjectPlatform>();
-  for (const platform of platforms) {
-    if (DESIGN_PLATFORMS.some((option) => option.value === platform)) {
-      seen.add(platform);
-    }
-  }
-  return seen.size > 0 ? [...seen] : ['responsive'];
-}
-
-function platformTargetsSupportOsWidgets(platforms: ProjectPlatform[] | NewProjectPlatform[]): boolean {
-  return platforms.some((platform) =>
-    platform === 'mobile-ios'
-    || platform === 'mobile-android'
-    || platform === 'tablet',
-  );
-}
-
-function platformTargetsFor(platforms: NewProjectPlatform[]): ProjectPlatform[] {
-  const targets = new Set<ProjectPlatform>();
-  for (const platform of platforms) {
-    switch (platform) {
-      case 'responsive':
-        targets.add('responsive');
-        break;
-      case 'web-desktop':
-        targets.add('web-desktop');
-        break;
-      case 'mobile-ios':
-        targets.add('mobile-ios');
-        break;
-      case 'mobile-android':
-        targets.add('mobile-android');
-        break;
-      case 'tablet':
-        targets.add('tablet');
-        break;
-      case 'desktop-app':
-        targets.add('desktop-app');
-        break;
-      default: {
-        const exhaustive: never = platform;
-        targets.add(exhaustive);
-      }
-    }
-  }
-  return targets.size > 0 ? [...targets] : ['responsive'];
 }
 
 function buildPromptTemplateMetadata(
@@ -2374,11 +2310,7 @@ function buildPromptTemplateMetadata(
   };
 }
 
-function titleForTab(
-  tab: CreateTab,
-  mediaSurface: MediaSurface,
-  t: TranslateFn,
-): string {
+function titleForTab(tab: CreateTab, t: TranslateFn): string {
   switch (tab) {
     case 'prototype':
       return t('newproj.titlePrototype');
@@ -2388,34 +2320,20 @@ function titleForTab(
       return t('newproj.titleDeck');
     case 'template':
       return t('newproj.titleTemplate');
-    case 'media': {
-      // Title tracks the active surface so the heading still reads "New
-      // image" / "New video" / "New audio" — the shared "Media" label only
-      // appears on the tab strip itself.
-      const key: keyof Dict =
-        mediaSurface === 'image'
-          ? 'newproj.titleImage'
-          : mediaSurface === 'video'
-            ? 'newproj.titleVideo'
-            : 'newproj.titleAudio';
-      return t(key);
-    }
+    case 'image':
+      return t('newproj.titleImage');
+    case 'video':
+      return t('newproj.titleVideo');
+    case 'audio':
+      return t('newproj.titleAudio');
     case 'other':
       return t('newproj.titleOther');
   }
 }
 
-function autoName(
-  tab: CreateTab,
-  mediaSurface: MediaSurface,
-  t: TranslateFn,
-): string {
+function autoName(tab: CreateTab, t: TranslateFn): string {
   const stamp = new Date().toLocaleDateString();
-  // For the Media tab the auto name reads "Image · {date}" / "Video · …" /
-  // "Audio · …" so the project list still surfaces the actual surface.
-  const labelKey: keyof Dict =
-    tab === 'media' ? MEDIA_SURFACE_LABEL_KEYS[mediaSurface] : TAB_LABEL_KEYS[tab];
-  return `${t(labelKey)} · ${stamp}`;
+  return `${t(TAB_LABEL_KEYS[tab])} · ${stamp}`;
 }
 
 /**

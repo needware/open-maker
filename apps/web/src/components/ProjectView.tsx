@@ -103,7 +103,16 @@ import { FACET_MODES, type FacetMode } from './FacetSetupPopover';
 import { FileWorkspace } from './FileWorkspace';
 import { Icon } from './Icon';
 import { CenteredLoader } from './Loading';
+import { ProjectActionsToolbar } from './ProjectActionsToolbar';
+import { Toast } from './Toast';
 import { WorkspaceFacetHero } from './WorkspaceFacetHero';
+import { useDesignMdState } from '../hooks/useDesignMdState';
+import { useFinalizeProject } from '../hooks/useFinalizeProject';
+import { useProjectDetail } from '../hooks/useProjectDetail';
+import { useTerminalLaunch } from '../hooks/useTerminalLaunch';
+import { buildClipboardPrompt } from '../lib/build-clipboard-prompt';
+import { copyToClipboard } from '../lib/copy-to-clipboard';
+import { effectiveMaxTokens } from '../state/maxTokens';
 
 interface Props {
   project: Project;
@@ -352,6 +361,21 @@ export function ProjectView({
   useEffect(() => {
     if (!instructionsOpen) setInstructionsDraft(project.customInstructions ?? '');
   }, [project.customInstructions, instructionsOpen]);
+
+  const handleSaveInstructions = useCallback(async () => {
+    const value = instructionsDraft.trim() || undefined;
+    if (value === (project.customInstructions ?? undefined)) {
+      setInstructionsOpen(false);
+      return;
+    }
+    setInstructionsSaving(true);
+    const result = await patchProject(project.id, { customInstructions: value ?? null });
+    setInstructionsSaving(false);
+    if (!result) return;
+    onProjectChange(result);
+    setInstructionsOpen(false);
+  }, [project, onProjectChange, instructionsDraft]);
+
   // PR #974 round 7 (mrcfps @ useDesignMdState.ts:131): counter that
   // bumps on file-changed SSE events, live_artifact* events, and the
   // chat streaming-completion edge so the staleness chip stays in sync
@@ -2546,7 +2570,7 @@ export function ProjectView({
       metadata: { kind: skill.mode === 'design-system' ? 'other' : skill.mode },
     });
     if (parsed.prompt) {
-      setInitialDraft(parsed.prompt);
+      setInitialDraft({ projectId: project.id, value: parsed.prompt });
     }
     window.sessionStorage.removeItem(PENDING_EXAMPLE_KEY);
     requestAnimationFrame(() => composerHandleRef.current?.focus());
@@ -2746,7 +2770,6 @@ export function ProjectView({
               facetSkillId={project.skillId ?? null}
               facetDesignSystemId={project.designSystemId ?? null}
               facetMetadata={project.metadata}
-              skills={skills}
               designSystems={designSystems}
               defaultDesignSystemId={defaultDesignSystemId}
               templates={templates}

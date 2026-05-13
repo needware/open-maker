@@ -362,6 +362,74 @@ export function EntryView({
   // OAuth callback handler in `apps/web/src/oauth-callback.html` can still
   // postMessage to a future settings panel.
 
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!avatarMenuRef.current) return;
+      if (!avatarMenuRef.current.contains(e.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAvatarMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [avatarMenuOpen]);
+
+  const avatarMenu = (
+    <div className="avatar-menu" ref={avatarMenuRef}>
+      <button
+        type="button"
+        className="settings-icon-btn"
+        onClick={() => setAvatarMenuOpen((v) => !v)}
+        title={t('entry.openSettingsTitle')}
+        aria-label={t('entry.openSettingsAria')}
+        aria-haspopup="menu"
+        aria-expanded={avatarMenuOpen}
+      >
+        <Icon name="settings" size={17} />
+      </button>
+      {avatarMenuOpen ? (
+        <div className="avatar-popover" role="menu">
+          <button
+            type="button"
+            className="avatar-item"
+            onClick={() => {
+              setPetRailHidden(!petRailHidden);
+              setAvatarMenuOpen(false);
+            }}
+          >
+            <span className="avatar-item-icon" aria-hidden>
+              <Icon name={petRailHidden ? 'sparkles' : 'eye'} size={14} />
+            </span>
+            <span>
+              {petRailHidden ? t('pet.railShow') : t('pet.railHide')}
+            </span>
+          </button>
+          <div style={{ height: 1, background: 'var(--border-soft)', margin: '4px 6px' }} />
+          <button
+            type="button"
+            className="avatar-item"
+            onClick={() => {
+              setAvatarMenuOpen(false);
+              onOpenSettings();
+            }}
+          >
+            <span className="avatar-item-icon" aria-hidden>
+              <Icon name="settings" size={14} />
+            </span>
+            <span>{t('avatar.settings')}</span>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="entry-shell">
       <AppChromeHeader actions={avatarMenu}>

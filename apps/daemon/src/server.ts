@@ -169,6 +169,7 @@ import {
   writeProjectFile,
 } from './projects.js';
 import { addRecent as addRecentProject, listRecent as listRecentProjects } from './recent-projects.js';
+import { importClaudeDesignZip } from './claude-design-import.js';
 import { validateArtifactManifestInput } from './artifact-manifest.js';
 import { readCurrentAppVersionInfo } from './app-version.js';
 import {
@@ -1767,6 +1768,21 @@ const upload = multer({
     },
   }),
   limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+const importUpload = multer({
+  storage: multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_req, file, cb) => {
+      file.originalname = decodeMultipartFilename(file.originalname);
+      const safe = sanitizeName(file.originalname);
+      cb(
+        null,
+        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`,
+      );
+    },
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 // Project-scoped multi-file upload. Lands files directly in the project

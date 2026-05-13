@@ -278,7 +278,6 @@ interface Props {
   facetSkillId?: string | null;
   facetDesignSystemId?: string | null;
   facetMetadata?: ProjectMetadata;
-  skills?: SkillSummary[];
   designSystems?: DesignSystemSummary[];
   defaultDesignSystemId?: string | null;
   templates?: ProjectTemplate[];
@@ -339,7 +338,6 @@ export function ChatPane({
   facetSkillId = null,
   facetDesignSystemId = null,
   facetMetadata,
-  skills,
   designSystems,
   defaultDesignSystemId,
   templates,

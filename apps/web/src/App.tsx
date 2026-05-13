@@ -8,6 +8,7 @@ import {
   type SettingsSection,
 } from './components/SettingsDialog';
 import { PrivacyConsentModal } from './components/PrivacyConsentModal';
+import { MemoryToast } from './components/MemoryToast';
 import {
   daemonIsLive,
   fetchAppVersionInfo,
