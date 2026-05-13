@@ -33,7 +33,14 @@ type TopTab = 'workspace' | 'examples' | 'design-systems' | 'image-templates' | 
 export const PENDING_EXAMPLE_KEY = 'open-design:pending-example';
 
 interface Props {
+  // Union of functional skills + design templates — used for id-based
+  // lookups (DesignsTab project chips, NewProjectPanel skill picker).
+  // The Templates gallery itself reads `designTemplates` instead so it
+  // doesn't accidentally show functional skills as renderable cards.
   skills: SkillSummary[];
+  // Design templates only. Sourced from /api/design-templates. See
+  // specs/current/skills-and-design-templates.md.
+  designTemplates: SkillSummary[];
   designSystems: DesignSystemSummary[];
   projects: Project[];
   /**
@@ -69,6 +76,7 @@ interface Props {
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
+  onRenameProject: (id: string, name: string) => void;
   onChangeDefaultDesignSystem: (id: string) => void;
   onOpenSettings: (section?: 'execution' | 'media' | 'composio' | 'language' | 'appearance' | 'notifications' | 'pet' | 'about') => void;
   onAdoptPet: () => void;
@@ -204,6 +212,7 @@ function loadPetRailHidden(): boolean {
 
 export function EntryView({
   skills,
+  designTemplates,
   designSystems,
   projects,
   recentProjects,
@@ -217,9 +226,11 @@ export function EntryView({
   projectsLoading = false,
   promptTemplatesLoading = false,
   onImportFolder,
+  onImportFolderResponse,
   onOpenProject,
   onOpenLiveArtifact,
   onDeleteProject,
+  onRenameProject,
   onChangeDefaultDesignSystem,
   onOpenSettings,
   onAdoptPet,
@@ -351,78 +362,6 @@ export function EntryView({
   // OAuth callback handler in `apps/web/src/oauth-callback.html` can still
   // postMessage to a future settings panel.
 
-  // Dismiss the avatar dropdown on outside-click / Escape so it behaves
-  // like the project-view AvatarMenu (which uses the same shell CSS).
-  useEffect(() => {
-    if (!avatarMenuOpen) return;
-    const onClick = (e: MouseEvent) => {
-      if (!avatarMenuRef.current) return;
-      if (!avatarMenuRef.current.contains(e.target as Node)) {
-        setAvatarMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setAvatarMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [avatarMenuOpen]);
-
-  const avatarMenu = (
-    <div className="avatar-menu" ref={avatarMenuRef}>
-      <button
-        type="button"
-        className="settings-icon-btn"
-        onClick={() => setAvatarMenuOpen((v) => !v)}
-        title={t('entry.openSettingsTitle')}
-        aria-label={t('entry.openSettingsAria')}
-        aria-haspopup="menu"
-        aria-expanded={avatarMenuOpen}
-      >
-        <Icon name="settings" size={17} />
-      </button>
-      {avatarMenuOpen ? (
-        <div className="avatar-popover" role="menu">
-          <button
-            type="button"
-            className="avatar-item"
-            onClick={() => {
-              setPetRailHidden(!petRailHidden);
-              setAvatarMenuOpen(false);
-            }}
-          >
-            <span className="avatar-item-icon" aria-hidden>
-              <Icon name={petRailHidden ? 'sparkles' : 'eye'} size={14} />
-            </span>
-            <span>
-              {petRailHidden
-                ? t('pet.railShow')
-                : t('pet.railHide')}
-            </span>
-          </button>
-          <div style={{ height: 1, background: 'var(--border-soft)', margin: '4px 6px' }} />
-          <button
-            type="button"
-            className="avatar-item"
-            onClick={() => {
-              setAvatarMenuOpen(false);
-              onOpenSettings();
-            }}
-          >
-            <span className="avatar-item-icon" aria-hidden>
-              <Icon name="settings" size={14} />
-            </span>
-            <span>{t('avatar.settings')}</span>
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-
   return (
     <div className="entry-shell">
       <AppChromeHeader actions={avatarMenu}>
@@ -453,46 +392,9 @@ export function EntryView({
       <aside className="entry-side" style={{ width: sidebarWidth }}>
         <SidebarHero onOpenPicker={openFolderPicker} />
         <div className="entry-side-foot">
-          <div className="entry-side-foot-row">
-            <button
-              type="button"
-              className={`foot-pill pet-pill${config.pet?.adopted ? '' : ' pet-pill-fresh'}`}
-              onClick={onAdoptPet}
-              title={
-                config.pet?.adopted
-                  ? t('pet.changePet')
-                  : t('pet.adoptCallout')
-              }
-            >
-              <span className="pet-pill-glyph" aria-hidden>
-                {config.pet?.adopted
-                  ? config.pet.petId === 'custom'
-                    ? config.pet.custom.glyph || '🦄'
-                    : '🐾'
-                  : '🐾'}
-              </span>
-              <span>
-                {config.pet?.adopted
-                  ? t('pet.changePet')
-                  : t('pet.adoptCallout')}
-              </span>
-              {!config.pet?.adopted ? <span className="pet-pill-dot" aria-hidden /> : null}
-            </button>
-            <a
-              className="foot-pill foot-pill-follow"
-              href="https://x.com/nexudotio"
-              target="_blank"
-              rel="noreferrer noopener"
-              title="Follow @nexudotio on X for releases and milestones"
-              aria-label="Follow @nexudotio on X"
-            >
-              <Icon name="external-link" size={12} />
-              <span className="foot-pill-follow-label">Follow @nexudotio</span>
-            </a>
-          </div>
           <button
             type="button"
-            className="foot-pill"
+            className="foot-pill foot-pill-env"
             onClick={() => onOpenSettings()}
             aria-label={t('settings.envConfigure')}
             title={t('settings.envConfigure')}
@@ -508,7 +410,65 @@ export function EntryView({
               {envMetaLine}
             </span>
           </button>
-          <LanguageMenu />
+          <div className="entry-side-foot-row">
+            <LanguageMenu />
+            <div className={`foot-pill pet-pill${config.pet?.adopted ? '' : ' pet-pill-fresh'}`}>
+              <button
+                type="button"
+                className="pet-pill-main"
+                onClick={onAdoptPet}
+                title={
+                  config.pet?.adopted
+                    ? t('pet.changePet')
+                    : t('pet.adoptCallout')
+                }
+              >
+                <span className="pet-pill-glyph" aria-hidden>
+                  {config.pet?.adopted
+                    ? config.pet.petId === 'custom'
+                      ? config.pet.custom.glyph || '🦄'
+                      : '🐾'
+                    : '🐾'}
+                </span>
+                <span className="foot-pill-pet-label">
+                  {config.pet?.adopted
+                    ? t('pet.changePet')
+                    : t('pet.adoptCallout')}
+                </span>
+                {!config.pet?.adopted ? <span className="pet-pill-dot" aria-hidden /> : null}
+              </button>
+              <span className="pet-pill-divider" aria-hidden />
+              <button
+                type="button"
+                className="pet-pill-toggle"
+                onClick={() => setPetRailHidden(!petRailHidden)}
+                aria-label={petRailHidden ? t('pet.railShow') : t('pet.railHide')}
+                title={petRailHidden ? t('pet.railShow') : t('pet.railHide')}
+              >
+                <Icon name={petRailHidden ? 'eye' : 'eye-off'} size={12} />
+              </button>
+            </div>
+            <a
+              className="foot-pill foot-pill-follow"
+              href="https://discord.com/invite/qhbcCH8Am4"
+              target="_blank"
+              rel="noreferrer noopener"
+              title="Join the Open Design Discord community"
+              aria-label="Join the Open Design Discord community"
+            >
+              <Icon name="discord" size={12} />
+            </a>
+            <a
+              className="foot-pill foot-pill-follow"
+              href="https://x.com/nexudotio"
+              target="_blank"
+              rel="noreferrer noopener"
+              title="Follow @nexudotio on X for releases and milestones"
+              aria-label="Follow @nexudotio on X"
+            >
+              <Icon name="external-link" size={12} />
+            </a>
+          </div>
         </div>
         <button
           type="button"
@@ -563,14 +523,18 @@ export function EntryView({
                 onOpen={onOpenProject}
                 onOpenLiveArtifact={onOpenLiveArtifact}
                 onDelete={onDeleteProject}
+                onRename={onRenameProject}
               />
             )
           ) : null}
-          {topTab === 'examples' ? (
+          {topTab === 'templates' ? (
             skillsLoading ? (
               <CenteredLoader label={t('common.loading')} />
             ) : (
-              <ExamplesTab skills={skills} onUsePrompt={usePromptFromSkill} />
+              <ExamplesTab
+                skills={designTemplates}
+                onUsePrompt={usePromptFromSkill}
+              />
             )
           ) : null}
           {topTab === 'design-systems' ? (

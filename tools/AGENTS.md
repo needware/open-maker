@@ -47,4 +47,8 @@ pnpm tools-pack linux install --headless
 pnpm tools-pack linux start --headless
 pnpm tools-pack linux stop --headless
 pnpm tools-pack linux build --containerized
+pnpm tools-pr list
+pnpm tools-pr list --bucket=merge-ready,approved-blocked
+pnpm tools-pr view <num>
+pnpm tools-pr view <num> --json
 ```

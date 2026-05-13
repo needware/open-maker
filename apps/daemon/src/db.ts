@@ -141,6 +141,7 @@ function migrate(db: SqliteDb): void {
       events_json TEXT,
       attachments_json TEXT,
       produced_files_json TEXT,
+      feedback_json TEXT,
       started_at INTEGER,
       ended_at INTEGER,
       position INTEGER NOT NULL,
@@ -248,6 +249,9 @@ function migrate(db: SqliteDb): void {
   if (!cols.some((c: DbRow) => c.name === 'metadata_json')) {
     db.exec(`ALTER TABLE projects ADD COLUMN metadata_json TEXT`);
   }
+  if (!cols.some((c: DbRow) => c.name === 'custom_instructions')) {
+    db.exec(`ALTER TABLE projects ADD COLUMN custom_instructions TEXT`);
+  }
   const messageCols = db.prepare(`PRAGMA table_info(messages)`).all() as DbRow[];
   if (!messageCols.some((c: DbRow) => c.name === 'agent_id')) {
     db.exec(`ALTER TABLE messages ADD COLUMN agent_id TEXT`);
@@ -266,6 +270,9 @@ function migrate(db: SqliteDb): void {
   }
   if (!messageCols.some((c: DbRow) => c.name === 'comment_attachments_json')) {
     db.exec(`ALTER TABLE messages ADD COLUMN comment_attachments_json TEXT`);
+  }
+  if (!messageCols.some((c: DbRow) => c.name === 'feedback_json')) {
+    db.exec(`ALTER TABLE messages ADD COLUMN feedback_json TEXT`);
   }
 
   const previewCommentCols = db.prepare(`PRAGMA table_info(preview_comments)`).all() as DbRow[];
@@ -464,6 +471,7 @@ const PROJECT_COLS = `id, name, skill_id AS skillId,
   design_system_id AS designSystemId,
   pending_prompt AS pendingPrompt,
   metadata_json AS metadataJson,
+  custom_instructions AS customInstructions,
   created_at AS createdAt,
   updated_at AS updatedAt`;
 
@@ -549,8 +557,8 @@ export function insertProject(db: SqliteDb, p: DbRow) {
   db.prepare(
     `INSERT INTO projects
        (id, name, skill_id, design_system_id, pending_prompt,
-        metadata_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        metadata_json, custom_instructions, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     p.id,
     p.name,
@@ -558,6 +566,7 @@ export function insertProject(db: SqliteDb, p: DbRow) {
     p.designSystemId ?? null,
     p.pendingPrompt ?? null,
     p.metadata ? JSON.stringify(p.metadata) : null,
+    p.customInstructions ?? null,
     p.createdAt,
     p.updatedAt,
   );
@@ -579,6 +588,7 @@ export function updateProject(db: SqliteDb, id: string, patch: DbRow) {
             design_system_id = ?,
             pending_prompt = ?,
             metadata_json = ?,
+            custom_instructions = ?,
             updated_at = ?
       WHERE id = ?`,
   ).run(
@@ -587,6 +597,7 @@ export function updateProject(db: SqliteDb, id: string, patch: DbRow) {
     merged.designSystemId ?? null,
     merged.pendingPrompt ?? null,
     merged.metadata ? JSON.stringify(merged.metadata) : null,
+    merged.customInstructions ?? null,
     merged.updatedAt,
     id,
   );
@@ -613,6 +624,7 @@ function normalizeProject(row: DbRow) {
     designSystemId: row.designSystemId,
     pendingPrompt: row.pendingPrompt ?? undefined,
     metadata,
+    customInstructions: row.customInstructions ?? undefined,
     createdAt: Number(row.createdAt),
     updatedAt: Number(row.updatedAt),
   };
@@ -658,6 +670,22 @@ export function getTemplate(db: SqliteDb, id: string) {
   return row ? normalizeTemplate(row) : null;
 }
 
+export function findTemplateByNameAndProject(
+  db: SqliteDb,
+  name: string,
+  sourceProjectId: string,
+) {
+  const row = db
+    .prepare(
+      `SELECT id, name, description, source_project_id AS sourceProjectId,
+              files_json AS filesJson, created_at AS createdAt
+         FROM templates
+        WHERE name = ? AND source_project_id = ?`,
+    )
+    .get(name, sourceProjectId) as DbRow | undefined;
+  return row ? normalizeTemplate(row) : null;
+}
+
 export function insertTemplate(db: SqliteDb, t: DbRow) {
   db.prepare(
     `INSERT INTO templates (id, name, description, source_project_id, files_json, created_at)
@@ -671,6 +699,17 @@ export function insertTemplate(db: SqliteDb, t: DbRow) {
     t.createdAt,
   );
   return getTemplate(db, t.id);
+}
+
+export function updateTemplate(
+  db: SqliteDb,
+  id: string,
+  t: { description: string | null; files: unknown[] },
+) {
+  db.prepare(
+    `UPDATE templates SET description = ?, files_json = ? WHERE id = ?`,
+  ).run(t.description, JSON.stringify(t.files), id);
+  return getTemplate(db, id);
 }
 
 export function deleteTemplate(db: SqliteDb, id: string) {
@@ -773,6 +812,7 @@ export function listMessages(db: SqliteDb, conversationId: string) {
               attachments_json AS attachmentsJson,
               comment_attachments_json AS commentAttachmentsJson,
               produced_files_json AS producedFilesJson,
+              feedback_json AS feedbackJson,
               created_at AS createdAt, started_at AS startedAt, ended_at AS endedAt,
               position
          FROM messages
@@ -794,7 +834,7 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
           SET role = ?, content = ?, agent_id = ?, agent_name = ?,
               run_id = ?, run_status = ?, last_run_event_id = ?,
               events_json = ?, attachments_json = ?, comment_attachments_json = ?,
-              produced_files_json = ?, started_at = ?, ended_at = ?
+              produced_files_json = ?, feedback_json = ?, started_at = ?, ended_at = ?
         WHERE id = ?`,
     ).run(
       m.role,
@@ -808,6 +848,7 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       m.attachments ? JSON.stringify(m.attachments) : null,
       m.commentAttachments ? JSON.stringify(m.commentAttachments) : null,
       m.producedFiles ? JSON.stringify(m.producedFiles) : null,
+      m.feedback ? JSON.stringify(m.feedback) : null,
       m.startedAt ?? null,
       m.endedAt ?? null,
       m.id,
@@ -819,17 +860,17 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       )
       .get(conversationId) as DbRow | undefined;
     const position = (max?.m ?? -1) + 1;
-    // 17 values: id, conversation_id, role, content, agent_id, agent_name,
+    // 18 values: id, conversation_id, role, content, agent_id, agent_name,
     // run_id, run_status, last_run_event_id, events_json, attachments_json,
-    // comment_attachments_json, produced_files_json, started_at, ended_at,
+    // comment_attachments_json, produced_files_json, feedback_json, started_at, ended_at,
     // position, created_at.
     db.prepare(
       `INSERT INTO messages
          (id, conversation_id, role, content, agent_id, agent_name,
           run_id, run_status, last_run_event_id, events_json,
           attachments_json, comment_attachments_json, produced_files_json,
-          started_at, ended_at, position, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          feedback_json, started_at, ended_at, position, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       m.id,
       conversationId,
@@ -844,6 +885,7 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       m.attachments ? JSON.stringify(m.attachments) : null,
       m.commentAttachments ? JSON.stringify(m.commentAttachments) : null,
       m.producedFiles ? JSON.stringify(m.producedFiles) : null,
+      m.feedback ? JSON.stringify(m.feedback) : null,
       m.startedAt ?? null,
       m.endedAt ?? null,
       position,
@@ -864,6 +906,7 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
               attachments_json AS attachmentsJson,
               comment_attachments_json AS commentAttachmentsJson,
               produced_files_json AS producedFilesJson,
+              feedback_json AS feedbackJson,
               created_at AS createdAt, started_at AS startedAt, ended_at AS endedAt,
               position
          FROM messages WHERE id = ?`,
@@ -1107,6 +1150,7 @@ function normalizeMessage(row: DbRow) {
     attachments: parseJsonOrUndef(row.attachmentsJson),
     commentAttachments: parseJsonOrUndef(row.commentAttachmentsJson),
     producedFiles: parseJsonOrUndef(row.producedFilesJson),
+    feedback: parseJsonOrUndef(row.feedbackJson),
     createdAt: row.createdAt ?? undefined,
     startedAt: row.startedAt ?? undefined,
     endedAt: row.endedAt ?? undefined,
