@@ -96,6 +96,8 @@ export const de: Dict = {
   'settings.agentInstall.stepSelect': 'Waehlen Sie die Agent-Karte aus, sobald sie als installiert angezeigt wird.',
   'settings.noAgentsDetected':
     'Noch keine Agents erkannt. Installieren Sie Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen oder GitHub Copilot CLI und klicken Sie dann auf Neu scannen.',
+  'settings.agentAuthRequired': 'Authentifizierung erforderlich',
+  'settings.agentAuthUnknown': 'Authentifizierungsstatus unbekannt',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Anbieter schnell ausfüllen',
   'settings.customProvider': 'Benutzerdefinierter Anbieter',
@@ -1143,6 +1145,7 @@ export const de: Dict = {
   'settings.connectorsSaveKey': "Key speichern",
   'settings.connectorsSaveKeyTitle': "Diesen Key an den lokalen Daemon senden",
   'settings.connectorsKeySaving': "Speichere…",
+  'settings.connectorsKeySaved': "Gespeichert ✓",
   'settings.connectorsKeyError': "Key konnte nicht gespeichert werden. Prüfe, ob der lokale Daemon läuft, und versuche es erneut.",
   'settings.connectorsHelpSaved': 'Dein Schlüssel entsperrt den Katalog unten und bleibt im lokalen Daemon. Füge einen neuen Schlüssel ein, um ihn zu ersetzen, oder lösche ihn.',
   'settings.connectorsHelpUnsaved': "Ungespeicherte Änderungen — klicke auf „Key speichern“, um diesen Schlüssel im lokalen Daemon abzulegen und den Katalog unten freizuschalten.",

@@ -71,12 +71,18 @@ import { handleCritiqueInterrupt } from './critique/interrupt-handler.js';
 import { handleCritiqueArtifact } from './critique/artifact-handler.js';
 import { createCopilotStreamHandler } from './copilot-stream.js';
 import { createJsonEventStreamHandler } from './json-event-stream.js';
+import { classifyAgentAuthFailure, cursorAuthGuidance } from './runtimes/auth.js';
 import { createQoderStreamHandler } from './qoder-stream.js';
 import { subscribe as subscribeFileEvents } from './project-watchers.js';
 import { renderDesignSystemPreview } from './design-system-preview.js';
 import { renderDesignSystemShowcase } from './design-system-showcase.js';
 import { createChatRunService } from './runs.js';
 import { reportRunCompletedFromDaemon } from './langfuse-bridge.js';
+import {
+  createAnalyticsService,
+  readAnalyticsContext,
+  readPublicConfigResponse,
+} from './analytics.js';
 import {
   redactSecrets,
   testAgentConnection,
@@ -96,6 +102,7 @@ import { loadCraftSections } from './craft.js';
 import { stageActiveSkill } from './cwd-aliases.js';
 import { buildDesktopPdfExportInput } from './pdf-export.js';
 import { generateMedia } from './media.js';
+import { listElevenLabsVoiceOptions } from './elevenlabs-voices.js';
 import { searchResearch, ResearchError } from './research/index.js';
 import { renderResearchCommandContract } from './prompts/research-contract.js';
 import {
@@ -685,9 +692,15 @@ export function normalizeCommentAttachments(input) {
       const elementId = cleanString(raw.elementId);
       const selector = cleanString(raw.selector);
       const label = cleanString(raw.label);
-      const comment = cleanString(raw.comment);
-      if (!filePath || !elementId || !selector || !comment) return null;
-      const selectionKind = raw.selectionKind === 'pod' ? 'pod' : 'element';
+      const screenshotPath = cleanString(raw.screenshotPath);
+      const markKind = normalizeVisualMarkKind(raw.markKind);
+      const intent = compactString(raw.intent, 220);
+      const comment = cleanString(raw.comment) || intent;
+      const selectionKind =
+        raw.selectionKind === 'visual' ? 'visual' : raw.selectionKind === 'pod' ? 'pod' : 'element';
+      if (!filePath || !elementId || !comment) return null;
+      if (selectionKind !== 'visual' && !selector) return null;
+      if (selectionKind === 'visual' && !screenshotPath) return null;
       const podMembers = selectionKind === 'pod' ? normalizeAttachmentPodMembers(raw.podMembers) : [];
       const memberCount =
         selectionKind === 'pod'
@@ -713,6 +726,11 @@ export function normalizeCommentAttachments(input) {
         selectionKind,
         memberCount,
         podMembers,
+        screenshotPath: selectionKind === 'visual' ? screenshotPath : undefined,
+        markKind: selectionKind === 'visual' ? markKind : undefined,
+        intent: selectionKind === 'visual'
+          ? intent || visualAnnotationIntent(markKind)
+          : undefined,
         source: raw.source === 'board-batch' ? 'board-batch' : 'saved-comment',
       };
     })
@@ -726,22 +744,32 @@ export function renderCommentAttachmentHint(commentAttachments) {
     '',
     '',
     '<attached-preview-comments>',
-    'Scope: treat each attachment as the default refinement target. For single elements, edit the target element first. For pods, coordinate the captured group as one design region and preserve unrelated areas.',
+    'Scope: treat each attachment as the default refinement target. For visual marks, inspect the screenshot and modify the marked region first. Preserve unrelated areas.',
   ];
   for (const item of commentAttachments) {
-    const targetKind = item.selectionKind === 'pod' ? 'pod' : 'element';
+    const targetKind =
+      item.selectionKind === 'visual' ? 'visual' : item.selectionKind === 'pod' ? 'pod' : 'element';
     lines.push(
       '',
       `${item.order}. ${item.elementId}`,
       `targetKind: ${targetKind}`,
       `file: ${item.filePath}`,
-      `selector: ${item.selector}`,
       `label: ${item.label || '(unlabeled)'}`,
       `position: ${formatAttachmentPosition(item.pagePosition)}`,
       `currentText: ${item.currentText || '(empty)'}`,
       `htmlHint: ${item.htmlHint || '(none)'}`,
       `comment: ${item.comment}`,
     );
+    if (targetKind === 'visual') {
+      lines.push(
+        `screenshot: ${item.screenshotPath}`,
+        `markKind: ${item.markKind || 'stroke'}`,
+        `intent: ${item.intent || visualAnnotationIntent(item.markKind || 'stroke')}`,
+      );
+      if (item.selector) lines.push(`selector: ${item.selector}`);
+    } else {
+      lines.splice(lines.length - 4, 0, `selector: ${item.selector}`);
+    }
     if (targetKind === 'pod') {
       lines.push(`memberCount: ${item.memberCount || item.podMembers.length || 0}`);
       item.podMembers.slice(0, 8).forEach((member, memberIndex) => {
@@ -757,6 +785,22 @@ export function renderCommentAttachmentHint(commentAttachments) {
 
 function cleanString(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeVisualMarkKind(value) {
+  return value === 'click' || value === 'click+stroke' || value === 'stroke'
+    ? value
+    : 'stroke';
+}
+
+function visualAnnotationIntent(markKind) {
+  if (markKind === 'click') {
+    return 'The screenshot has a blue focus box around the picked element; modify that picked part first.';
+  }
+  if (markKind === 'click+stroke') {
+    return 'The screenshot has a blue focus box and red strokes; together they identify the part the user wants changed.';
+  }
+  return 'The screenshot has red strokes that identify the visual region the user wants changed.';
 }
 
 function compactString(value, max) {
@@ -1297,6 +1341,37 @@ export function shouldReportRunCompletedFromMessage(saved, body = {}) {
 
 export function telemetryPromptFromRunRequest(message, currentPrompt) {
   return typeof currentPrompt === 'string' ? currentPrompt : message;
+}
+
+export function createFinalizedMessageTelemetryReporter({
+  design,
+  db,
+  dataDir,
+  reportedRuns,
+  getAppVersion = () => null,
+  report = reportRunCompletedFromDaemon,
+}: {
+  design: any;
+  db: unknown;
+  dataDir: string;
+  reportedRuns: Set<string>;
+  getAppVersion?: () => any;
+  report?: typeof reportRunCompletedFromDaemon;
+}) {
+  return (saved, body = {}) => {
+    if (!shouldReportRunCompletedFromMessage(saved, body)) return;
+    const run = design.runs.get(saved.runId);
+    if (!run || reportedRuns.has(run.id)) return;
+    reportedRuns.add(run.id);
+    void report({
+      db,
+      dataDir,
+      run,
+      persistedRunStatus: saved.runStatus,
+      persistedEndedAt: saved.endedAt,
+      appVersion: getAppVersion(),
+    });
+  };
 }
 
 const CLOUDFLARE_PAGES_PROJECT_METADATA_KEY = 'cloudflarePagesProjectName';
@@ -5212,9 +5287,43 @@ export async function startServer({
     },
   );
 
+  const analyticsService = createAnalyticsService({ dataDir: RUNTIME_DATA_DIR });
   const design = {
     runs: createChatRunService({ createSseResponse, createSseErrorPayload }),
+    analytics: analyticsService,
+    getAppVersion: () => cachedAppVersion?.version ?? '0.0.0',
+    readAnalyticsContext,
   };
+
+  // PostHog runtime config — gated on BOTH a server-side key (POSTHOG_KEY)
+  // and the user's opt-in metrics consent (Privacy → "Share usage data").
+  // The web bundle short-circuits when enabled=false so opt-out behaviour
+  // is instant after the user toggles metrics off and reloads.
+  app.get('/api/analytics/config', async (_req, res) => {
+    const baseline = readPublicConfigResponse();
+    if (!baseline.enabled) {
+      res.json(baseline);
+      return;
+    }
+    try {
+      const appCfg = await readAppConfig(RUNTIME_DATA_DIR);
+      const consentGranted = appCfg.telemetry?.metrics === true;
+      if (!consentGranted) {
+        res.json({ enabled: false, key: null, host: null });
+        return;
+      }
+      // Echo the installationId so the web client uses the same anonymous
+      // id PostHog already saw on prior runs (and that Langfuse uses too).
+      const installationId =
+        typeof appCfg.installationId === 'string' && appCfg.installationId
+          ? appCfg.installationId
+          : null;
+      res.json({ ...baseline, installationId });
+    } catch {
+      // If the config file is unreadable, fail closed — no events.
+      res.json({ enabled: false, key: null, host: null });
+    }
+  });
 
   // Tracks runs whose completion has already been forwarded to Langfuse so
   // repeated message updates only emit one trace per run.
@@ -5229,6 +5338,14 @@ export async function startServer({
       // Telemetry is best-effort; appVersion is omitted when unavailable.
     }
   })();
+
+  const reportFinalizedMessage = createFinalizedMessageTelemetryReporter({
+    design,
+    db,
+    dataDir: RUNTIME_DATA_DIR,
+    reportedRuns,
+    getAppVersion: () => cachedAppVersion,
+  });
 
   const validateExternalApiBaseUrl = (baseUrl) => validateBaseUrl(baseUrl);
 
@@ -5374,6 +5491,7 @@ export async function startServer({
     getLiveMediaTask: (taskId) => getLiveMediaTask(db, taskId),
     mediaTaskSnapshot,
     listMediaTasksByProject,
+    listElevenLabsVoiceOptions,
   };
   const appConfigDeps = { readAppConfig, writeAppConfig };
   const orbitDeps = { orbitService };
@@ -5451,6 +5569,7 @@ export async function startServer({
     status: projectStatusDeps,
     events: projectEventDeps,
     ids: idDeps,
+    telemetry: { reportFinalizedMessage },
   });
   registerImportRoutes(app, {
     db,
@@ -5667,6 +5786,21 @@ export async function startServer({
       metadata?.kind === 'template' && typeof metadata.templateId === 'string'
         ? (getTemplate(db, metadata.templateId) ?? undefined)
         : undefined;
+    let audioVoiceOptions = [];
+    let audioVoiceOptionsError;
+    if (
+      metadata?.kind === 'audio' &&
+      metadata?.audioKind === 'speech' &&
+      metadata?.audioModel === 'elevenlabs-v3' &&
+      !metadata?.voice
+    ) {
+      try {
+        audioVoiceOptions = await listElevenLabsVoiceOptions(PROJECT_ROOT, { limit: 100 });
+      } catch (err) {
+        audioVoiceOptionsError = err && err.message ? err.message : String(err);
+        console.warn('[elevenlabs] voice option lookup failed:', audioVoiceOptionsError);
+      }
+    }
 
     // Thread the critique config plus the active design-system / skill data
     // into the composer when critique is enabled. Without this the spawned
@@ -5728,6 +5862,8 @@ export async function startServer({
       memoryBody,
       metadata,
       template,
+      audioVoiceOptions,
+      audioVoiceOptionsError,
       critique: critiqueShouldRun ? critiqueCfg : undefined,
       critiqueBrand: critiqueShouldRun ? critiqueBrand : undefined,
       critiqueSkill: critiqueShouldRun ? critiqueSkill : undefined,
@@ -6470,9 +6606,7 @@ export async function startServer({
     child.stdout.on('data', (chunk) => {
       childStdoutSeen = true;
       noteAgentActivity();
-      if (def.id === 'claude') {
-        agentStdoutTail = `${agentStdoutTail}${chunk}`.slice(-1000);
-      }
+      agentStdoutTail = `${agentStdoutTail}${chunk}`.slice(-2000);
     });
 
     // ---- Memory: assistant-reply buffer for LLM extraction --------------
@@ -6657,6 +6791,23 @@ export async function startServer({
         if (agentStreamError) return;
         agentStreamError = String(ev.message || 'Agent stream error');
         clearInactivityWatchdog();
+        const authFailure = classifyAgentAuthFailure(
+          agentId,
+          [
+            agentStreamError,
+            typeof ev.raw === 'string' ? ev.raw : '',
+            agentStdoutTail,
+            agentStderrTail,
+          ].join('\n'),
+        );
+        if (authFailure?.status === 'missing') {
+          send('error', createSseErrorPayload(
+            'AGENT_AUTH_REQUIRED',
+            cursorAuthGuidance(),
+            { retryable: true },
+          ));
+          return;
+        }
         send('error', createSseErrorPayload('AGENT_EXECUTION_FAILED', agentStreamError, {
           details: ev.raw ? { raw: ev.raw } : undefined,
           retryable: false,
@@ -6770,9 +6921,7 @@ export async function startServer({
     run.acpSession = acpSession;
     child.stderr.on('data', (chunk) => {
       noteAgentActivity();
-      if (def.id === 'claude') {
-        agentStderrTail = `${agentStderrTail}${chunk}`.slice(-1000);
-      }
+      agentStderrTail = `${agentStderrTail}${chunk}`.slice(-2000);
       send('stderr', { chunk });
     });
 
@@ -6791,6 +6940,18 @@ export async function startServer({
         return design.runs.finish(run, 'failed', code ?? 1, signal ?? null);
       }
       if (agentStreamError) {
+        return design.runs.finish(run, 'failed', code ?? 1, signal ?? null);
+      }
+      if (
+        code !== 0 &&
+        !run.cancelRequested &&
+        classifyAgentAuthFailure(agentId, `${agentStderrTail}\n${agentStdoutTail}`)?.status === 'missing'
+      ) {
+        send('error', createSseErrorPayload(
+          'AGENT_AUTH_REQUIRED',
+          cursorAuthGuidance(),
+          { retryable: true },
+        ));
         return design.runs.finish(run, 'failed', code ?? 1, signal ?? null);
       }
       // Empty-output guard: a clean `code === 0` exit on a stream we are
@@ -7226,6 +7387,7 @@ export async function startServer({
       daemonShutdownStarted = true;
       daemonShuttingDown = true;
       await design.runs.shutdownActive({ graceMs: resolveChatRunShutdownGraceMs() });
+      await design.analytics.shutdown();
     };
     let server;
     try {

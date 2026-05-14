@@ -96,6 +96,8 @@ export const pl: Dict = {
   'settings.agentInstall.stepSelect': 'Wybierz kartę agenta, gdy pojawi się jako zainstalowany.',
   'settings.noAgentsDetected':
       'Nie wykryto jeszcze żadnych agentów. Zainstaluj Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen lub GitHub Copilot CLI, a następnie kliknij Ponów skanowanie.',
+  'settings.agentAuthRequired': 'Wymagane uwierzytelnienie',
+  'settings.agentAuthUnknown': 'Stan uwierzytelnienia nieznany',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Szybkie wypełnienie dostawcy',
   'settings.customProvider': 'Niestandardowy dostawca',
@@ -1214,6 +1216,7 @@ export const pl: Dict = {
   'settings.connectorsSaveKey': "Zapisz klucz",
   'settings.connectorsSaveKeyTitle': "Wyślij ten klucz do lokalnego demona",
   'settings.connectorsKeySaving': "Zapisywanie…",
+  'settings.connectorsKeySaved': "Zapisano ✓",
   'settings.connectorsKeyError': "Nie udało się zapisać klucza. Sprawdź, czy lokalny demon działa, i spróbuj ponownie.",
   'settings.connectorsHelpSaved': 'Twój klucz odblokowuje katalog poniżej i pozostaje w lokalnym daemon. Wklej nowy klucz, aby go zastąpić, albo wyczyść, aby usunąć.',
   'settings.connectorsHelpUnsaved': "Niezapisane zmiany — kliknij Zapisz klucz, aby zachować te dane w lokalnym demonie i odblokować katalog poniżej.",

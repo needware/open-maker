@@ -96,6 +96,8 @@ export const fa: Dict = {
   'settings.agentInstall.stepSelect': 'وقتی عامل به‌صورت نصب‌شده نمایش داده شد، کارت آن را انتخاب کنید.',
   'settings.noAgentsDetected':
     'هنوز هیچ عاملی شناسایی نشده. یکی از Claude Code، Codex، Gemini CLI، OpenCode، Cursor Agent، Qwen یا GitHub Copilot CLI را نصب کنید، سپس روی اسکن مجدد کلیک کنید.',
+  'settings.agentAuthRequired': 'احراز هویت لازم است',
+  'settings.agentAuthUnknown': 'وضعیت احراز هویت نامشخص است',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'پر کردن سریع ارائه‌دهنده',
   'settings.customProvider': 'ارائه‌دهنده سفارشی',
@@ -1257,6 +1259,7 @@ export const fa: Dict = {
   'settings.connectorsSaveKey': "ذخیره کلید",
   'settings.connectorsSaveKeyTitle': "ارسال این کلید به daemon محلی",
   'settings.connectorsKeySaving': "در حال ذخیره…",
+  'settings.connectorsKeySaved': "ذخیره شد ✓",
   'settings.connectorsKeyError': "ذخیره کلید ممکن نشد. بررسی کنید daemon محلی در حال اجراست و دوباره تلاش کنید.",
   'settings.connectorsHelpSaved': 'کلید شما کاتالوگ پایین را باز می‌کند و در daemon محلی می‌ماند. برای جایگزینی، کلید جدیدی جای‌گذاری کنید یا برای حذف، پاک کنید.',
   'settings.connectorsHelpUnsaved': "تغییرات ذخیره‌نشده — برای ذخیرهٔ این اعتبارنامه در daemon محلی و باز کردن کاتالوگ پایین، روی «ذخیره کلید» بزنید.",

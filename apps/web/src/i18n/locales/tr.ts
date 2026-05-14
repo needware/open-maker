@@ -96,6 +96,8 @@ export const tr: Dict = {
   'settings.agentInstall.stepSelect': 'Ajan yüklü olarak göründüğünde kartını seç.',
   'settings.noAgentsDetected':
     'Hiçbir ajan tespit edilemedi. Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen, veya GitHub Copilot CLI’lardan birini kurun ve yeniden tarayın.',
+  'settings.agentAuthRequired': 'Kimlik doğrulama gerekli',
+  'settings.agentAuthUnknown': 'Kimlik doğrulama durumu bilinmiyor',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Sağlayıcıyı hızlı doldur',
   'settings.customProvider': 'Özel sağlayıcı',
@@ -1201,6 +1203,7 @@ export const tr: Dict = {
   'settings.connectorsSaveKey': "Anahtarı kaydet",
   'settings.connectorsSaveKeyTitle': "Bu anahtarı yerel daemon’a gönder",
   'settings.connectorsKeySaving': "Kaydediliyor…",
+  'settings.connectorsKeySaved': "Kaydedildi ✓",
   'settings.connectorsKeyError': "Anahtar kaydedilemedi. Yerel daemon’ın çalıştığını doğrulayın ve tekrar deneyin.",
   'settings.connectorsHelpSaved': 'Anahtarınız aşağıdaki kataloğu açar ve yerel daemon’da kalır. Değiştirmek için yeni anahtar yapıştırın veya kaldırmak için temizleyin.',
   'settings.connectorsHelpUnsaved': "Kaydedilmemiş değişiklikler — bu kimlik bilgisini yerel daemon’a kaydetmek ve aşağıdaki kataloğu açmak için Anahtarı kaydet’e tıklayın.",

@@ -96,6 +96,8 @@ export const ja: Dict = {
   'settings.agentInstall.stepSelect': 'インストール済みとして表示されたらエージェントカードを選択します。',
   'settings.noAgentsDetected':
     'エージェントが検出されませんでした。Claude Code、Codex、Gemini CLI、OpenCode、Cursor Agent、Qwen、または GitHub Copilot CLI のいずれかをインストールして、再スキャンをクリックしてください。',
+  'settings.agentAuthRequired': '認証が必要です',
+  'settings.agentAuthUnknown': '認証状態は不明です',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'プロバイダーをクイック入力',
   'settings.customProvider': 'カスタムプロバイダー',
@@ -1142,6 +1144,7 @@ export const ja: Dict = {
   'settings.connectorsSaveKey': "キーを保存",
   'settings.connectorsSaveKeyTitle': "このキーをローカルの daemon に送信",
   'settings.connectorsKeySaving': "保存中…",
+  'settings.connectorsKeySaved': "保存完了 ✓",
   'settings.connectorsKeyError': "キーを保存できませんでした。ローカルの daemon が起動しているか確認して、もう一度お試しください。",
   'settings.connectorsHelpSaved': 'キーは下のカタログを有効にし、ローカル daemon に保持されます。置き換えるには新しいキーを貼り付け、削除するにはクリアしてください。',
   'settings.connectorsHelpUnsaved': "未保存の変更があります — 「キーを保存」をクリックすると、この資格情報がローカル daemon に保存され、下のカタログが解除されます。",

@@ -95,6 +95,8 @@ export const id: Dict = {
   'settings.agentInstall.stepSelect': 'Pilih kartu agen setelah statusnya terpasang.',
   'settings.noAgentsDetected':
     'Belum ada agent terdeteksi. Pasang salah satu dari Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen, atau GitHub Copilot CLI, lalu klik pindai ulang.',
+  'settings.agentAuthRequired': 'Autentikasi diperlukan',
+  'settings.agentAuthUnknown': 'Status autentikasi tidak diketahui',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Provider isi cepat',
   'settings.customProvider': 'Provider kustom',
@@ -214,6 +216,7 @@ export const id: Dict = {
   'settings.connectorsSaveKey': 'Simpan key',
   'settings.connectorsSaveKeyTitle': 'Kirim key ini ke daemon lokal',
   'settings.connectorsKeySaving': 'Menyimpan…',
+  'settings.connectorsKeySaved': "Tersimpan ✓",
   'settings.connectorsKeyError': 'Tidak bisa menyimpan key. Pastikan daemon lokal berjalan lalu coba lagi.',
   'settings.connectorsHelpSaved':
     'Key kamu tersimpan di daemon lokal. Tempel key baru untuk menggantinya, atau Hapus untuk menghapusnya.',

@@ -96,6 +96,8 @@ export const esES: Dict = {
   'settings.agentInstall.stepSelect': 'Selecciona la tarjeta del agente cuando aparezca como instalado.',
   'settings.noAgentsDetected':
     'Aún no se ha detectado ningún agente. Instala Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen o GitHub Copilot CLI y pulsa Reescanear.',
+  'settings.agentAuthRequired': 'Autenticación requerida',
+  'settings.agentAuthUnknown': 'Estado de autenticación desconocido',
   'settings.apiSection': 'API de Anthropic',
   'settings.quickFillProvider': 'Rellenar proveedor',
   'settings.customProvider': 'Proveedor personalizado',
@@ -1103,6 +1105,7 @@ export const esES: Dict = {
   'settings.connectorsSaveKey': "Guardar clave",
   'settings.connectorsSaveKeyTitle': "Enviar esta clave al daemon local",
   'settings.connectorsKeySaving': "Guardando…",
+  'settings.connectorsKeySaved': "Guardado ✓",
   'settings.connectorsKeyError': "No se pudo guardar la clave. Comprueba que el daemon local está activo y vuelve a intentarlo.",
   'settings.connectorsHelpSaved': 'Tu clave desbloquea el catálogo de abajo y permanece en el daemon local. Pega una clave nueva para sustituirla o bórrala.',
   'settings.connectorsHelpUnsaved': "Cambios sin guardar — pulsa Guardar clave para almacenar esta credencial en el daemon local y desbloquear el catálogo de abajo.",

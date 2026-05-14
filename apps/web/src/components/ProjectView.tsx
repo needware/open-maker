@@ -19,6 +19,7 @@ import {
   reattachDaemonRun,
   streamViaDaemon,
 } from '../providers/daemon';
+import { fetchElevenLabsVoiceOptions } from '../providers/elevenlabs-voices';
 import {
   deletePreviewComment,
   fetchPreviewComments,
@@ -34,9 +35,11 @@ import {
 import { useProjectFileEvents, type ProjectEvent } from '../providers/project-events';
 import {
   composeSystemPrompt,
+  type AudioVoiceOption,
   type MemorySystemPromptResponse,
   type ResearchOptions,
 } from '@open-design/contracts';
+import { projectKindToTracking } from '@open-design/contracts/analytics';
 import { navigate } from '../router';
 import { agentDisplayName, agentModelDisplayName } from '../utils/agentLabels';
 import { isMacPlatform } from '../utils/platform';
@@ -79,7 +82,6 @@ import type {
   PreviewComment,
   PreviewCommentTarget,
   ProjectFile,
-  ProjectPlatform,
   ProjectTemplate,
   PromptTemplateSummary,
   LiveArtifactEventItem,
@@ -231,6 +233,14 @@ export function projectSplitClassName(workspaceFocused: boolean): string {
   return workspaceFocused ? 'split split-focus' : 'split';
 }
 
+function shouldFetchElevenLabsVoiceOptions(project: Project): boolean {
+  const metadata = project.metadata;
+  return metadata?.kind === 'audio'
+    && metadata.audioKind === 'speech'
+    && metadata.audioModel === 'elevenlabs-v3'
+    && !metadata.voice;
+}
+
 function projectEventToAgentEvent(evt: ProjectEvent): LiveArtifactEventItem['event'] | null {
   if (evt.type === 'file-changed') return null;
   if (evt.type === 'conversation-created') return null;
@@ -254,56 +264,6 @@ function projectEventToAgentEvent(evt: ProjectEvent): LiveArtifactEventItem['eve
     refreshedSourceCount: evt.refreshedSourceCount,
     error: evt.error,
   };
-}
-
-const PLATFORM_LABELS: Record<ProjectPlatform, string> = {
-  auto: 'Auto',
-  responsive: 'Responsive web',
-  'web-desktop': 'Desktop web',
-  'mobile-ios': 'iOS app',
-  'mobile-android': 'Android app',
-  tablet: 'Tablet app',
-  'desktop-app': 'Desktop app',
-};
-
-function labelProjectPlatform(platform: ProjectPlatform | string): string {
-  return PLATFORM_LABELS[platform as ProjectPlatform] ?? platform;
-}
-
-function projectTargetPlatforms(project: Project): string[] {
-  const targets = project.metadata?.platformTargets;
-  if (Array.isArray(targets) && targets.length > 0) {
-    return [...new Set(targets)].map(labelProjectPlatform);
-  }
-  if (project.metadata?.platform) {
-    return [labelProjectPlatform(project.metadata.platform)];
-  }
-  return [];
-}
-
-type ProjectFeatureChip = {
-  label: string;
-  title: string;
-  tone: 'landing' | 'widgets';
-};
-
-function projectFeatureChips(project: Project): ProjectFeatureChip[] {
-  const chips: ProjectFeatureChip[] = [];
-  if (project.metadata?.includeLandingPage) {
-    chips.push({
-      label: 'Landing page',
-      title: 'Landing page companion surface is enabled for this project',
-      tone: 'landing',
-    });
-  }
-  if (project.metadata?.includeOsWidgets) {
-    chips.push({
-      label: 'OS widgets',
-      title: 'Home-screen, lock-screen, or quick-access OS widget surfaces are enabled',
-      tone: 'widgets',
-    });
-  }
-  return chips;
 }
 
 export function ProjectView({
@@ -347,6 +307,7 @@ export function ProjectView({
   const [attachedComments, setAttachedComments] = useState<PreviewComment[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioVoiceOptionsError, setAudioVoiceOptionsError] = useState<string | null>(null);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [filesRefresh, setFilesRefresh] = useState(0);
   const [projectFiles, setProjectFiles] = useState<ProjectFile[]>([]);
@@ -506,6 +467,7 @@ export function ProjectView({
     setAttachedComments([]);
     setStreaming(false);
     setError(null);
+    setAudioVoiceOptionsError(null);
     setArtifact(null);
     savedArtifactRef.current = null;
     pendingWritesRef.current.clear();
@@ -955,6 +917,22 @@ export function ProjectView({
     } catch {
       // Ignore; memory injection is best-effort.
     }
+    let audioVoiceOptions: AudioVoiceOption[] | undefined;
+    let audioVoiceOptionsLookupError: string | undefined;
+    if (shouldFetchElevenLabsVoiceOptions(project)) {
+      try {
+        audioVoiceOptions = await fetchElevenLabsVoiceOptions();
+        setAudioVoiceOptionsError(null);
+      } catch (err) {
+        const message = err instanceof Error
+          ? err.message
+          : 'ElevenLabs voice list could not be loaded.';
+        audioVoiceOptionsLookupError = message;
+        setAudioVoiceOptionsError(message);
+      }
+    } else {
+      setAudioVoiceOptionsError(null);
+    }
     return composeSystemPrompt({
       skillBody,
       skillName,
@@ -964,6 +942,8 @@ export function ProjectView({
       memoryBody,
       metadata: project.metadata,
       template,
+      audioVoiceOptions,
+      audioVoiceOptionsError: audioVoiceOptionsLookupError,
       streamFormat: config.mode === 'api' ? 'plain' : undefined,
       userInstructions: config.customInstructions,
       projectInstructions: project.customInstructions,
@@ -2207,13 +2187,6 @@ export function ProjectView({
     return [skill, ds].filter(Boolean).join(' · ') || t('project.metaFreeform');
   }, [skills, designTemplates, designSystems, project.skillId, project.designSystemId, t]);
 
-  const targetPlatforms = useMemo(() => projectTargetPlatforms(project), [project]);
-  const targetPlatformsLabel = targetPlatforms.join(', ');
-  const visibleTargetPlatforms = targetPlatforms.slice(0, 5);
-  const hiddenTargetPlatformCount = Math.max(0, targetPlatforms.length - visibleTargetPlatforms.length);
-  const featureChips = useMemo(() => projectFeatureChips(project), [project]);
-  const featureChipsLabel = featureChips.map((chip) => chip.label).join(', ');
-
   const isDeck = useMemo(
     () =>
       (skills.find((s) => s.id === project.skillId) ??
@@ -2631,43 +2604,6 @@ export function ProjectView({
               <Icon name="edit" size={13} />
             </button>
           </span>
-          {targetPlatforms.length > 0 ? (
-            <span
-              className="project-target-platforms"
-              data-testid="project-target-platforms"
-              title={`Target platforms: ${targetPlatformsLabel}`}
-            >
-              <span className="project-target-platforms-label">Targets</span>
-              {visibleTargetPlatforms.map((platform) => (
-                <span className="project-target-platform-chip" key={platform}>
-                  {platform}
-                </span>
-              ))}
-              {hiddenTargetPlatformCount > 0 ? (
-                <span className="project-target-platform-chip is-count">
-                  +{hiddenTargetPlatformCount}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-          {featureChips.length > 0 ? (
-            <span
-              className="project-feature-chips"
-              data-testid="project-feature-chips"
-              title={`Enabled design outputs: ${featureChipsLabel}`}
-            >
-              <span className="project-feature-chips-label">Includes</span>
-              {featureChips.map((chip) => (
-                <span
-                  className={`project-feature-chip is-${chip.tone}`}
-                  key={chip.tone}
-                  title={chip.title}
-                >
-                  {chip.label}
-                </span>
-              ))}
-            </span>
-          ) : null}
         </div>
       </AppChromeHeader>
       {instructionsOpen && (
@@ -2726,7 +2662,7 @@ export function ProjectView({
               messages={messages}
               streaming={currentConversationStreaming}
               sendDisabled={currentConversationSendDisabled}
-              error={conversationLoadError ?? error}
+              error={conversationLoadError ?? error ?? audioVoiceOptionsError}
               projectId={project.id}
               projectFiles={projectFiles}
               projectFileNames={projectFileNames}
@@ -2812,6 +2748,7 @@ export function ProjectView({
         ) : (
           <FileWorkspace
             projectId={project.id}
+            projectKind={projectKindToTracking(project.metadata?.kind) ?? 'prototype'}
             files={projectFiles}
             liveArtifacts={liveArtifacts}
             onRefreshFiles={() => {
@@ -2819,7 +2756,7 @@ export function ProjectView({
             }}
             isDeck={isDeck}
             onExportAsPptx={handleExportAsPptx}
-            streaming={streaming}
+            streaming={currentConversationActionDisabled}
             openRequest={openRequest}
             liveArtifactEvents={liveArtifactEvents}
             tabsState={openTabsState}

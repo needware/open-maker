@@ -96,6 +96,8 @@ export const hu: Dict = {
   'settings.agentInstall.stepSelect': 'Válaszd ki az ügynök kártyáját, amint telepítettként jelenik meg.',
   'settings.noAgentsDetected':
     'Még nincs észlelt ügynök. Telepítsd a Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen vagy GitHub Copilot CLI valamelyikét, majd kattints az Újraellenőrzésre.',
+  'settings.agentAuthRequired': 'Hitelesítés szükséges',
+  'settings.agentAuthUnknown': 'A hitelesítési állapot ismeretlen',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Szolgáltató gyors kitöltése',
   'settings.customProvider': 'Egyéni szolgáltató',
@@ -1224,6 +1226,7 @@ export const hu: Dict = {
   'settings.connectorsSaveKey': "Kulcs mentése",
   'settings.connectorsSaveKeyTitle': "Kulcs elküldése a helyi daemonhoz",
   'settings.connectorsKeySaving': "Mentés…",
+  'settings.connectorsKeySaved': "Mentve ✓",
   'settings.connectorsKeyError': "A kulcs mentése nem sikerült. Ellenőrizd, hogy a helyi daemon fut-e, majd próbáld újra.",
   'settings.connectorsHelpSaved': 'A kulcs feloldja az alábbi katalógust, és a helyi daemonban marad. Illessz be új kulcsot a cseréhez, vagy töröld az eltávolításhoz.',
   'settings.connectorsHelpUnsaved': "Mentetlen változtatások — kattints a Kulcs mentése gombra, hogy a hitelesítő adat a helyi daemonba kerüljön, és nyíljon a lenti katalógus.",

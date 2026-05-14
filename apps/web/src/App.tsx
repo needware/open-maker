@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useAnalytics } from './analytics/provider';
+import { trackAppLaunch, trackProjectCreateResult } from './analytics/events';
+import { detectClientType, detectLaunchSource } from './analytics/identity';
+import {
+  projectKindToTracking,
+  fidelityToTracking,
+} from '@open-design/contracts/analytics';
 import { EntryView } from './components/EntryView';
 import { PetOverlay } from './components/pet/PetOverlay';
 import { migrateCustomPetAtlas } from './components/pet/pets';
@@ -202,6 +209,43 @@ export function App() {
   // can't overwrite the saved state with `''` before hydration lands.
   const [composioConfigLoading, setComposioConfigLoading] = useState(true);
   const route = useRoute();
+  const analytics = useAnalytics();
+
+  // app_launch — fired exactly once per page load. Mounting in App, not the
+  // RootLayout, so we capture after the first React tick and the analytics
+  // provider has had a chance to wire its identity. Gated on
+  // `config.telemetry?.metrics` so a freshly-opted-in user gets the event
+  // on their next reload, and a declined user fires nothing.
+  const appLaunchFiredRef = useRef(false);
+  useEffect(() => {
+    if (appLaunchFiredRef.current) return;
+    if (config.telemetry?.metrics !== true) return;
+    appLaunchFiredRef.current = true;
+    trackAppLaunch(analytics.track, {
+      page: 'app',
+      launch_source: detectLaunchSource(),
+      platform: detectClientType(),
+    });
+  }, [analytics.track, config.telemetry?.metrics]);
+
+  // Propagate the Privacy toggle through to PostHog without a reload —
+  // posthog-js's opt_out_capturing flips a localStorage flag that makes
+  // every subsequent capture() a no-op. When the user opts back in we
+  // call opt_in_capturing to resume.
+  useEffect(() => {
+    analytics.setConsent(config.telemetry?.metrics === true);
+  }, [analytics.setConsent, config.telemetry?.metrics]);
+
+  // Sync PostHog's distinct_id with the anonymous installationId, both on
+  // first opt-in (when the daemon stamps a fresh id) and on Delete-my-data
+  // rotation (when PrivacySection.tsx generates a new one). posthog-js
+  // caches the previous id in localStorage; identify() alone would stitch
+  // the two ids together, so applyIdentity() does reset() first to
+  // guarantee the new session is fully decoupled from the deleted one.
+  useEffect(() => {
+    if (config.telemetry?.metrics !== true) return;
+    analytics.setIdentity(config.installationId ?? null);
+  }, [analytics.setIdentity, config.installationId, config.telemetry?.metrics]);
 
   // Sync theme preference to the <html> element so CSS variables pick it up.
   // useLayoutEffect (vs useEffect) fires before the browser paints, so a

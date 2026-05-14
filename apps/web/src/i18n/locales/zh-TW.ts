@@ -95,6 +95,8 @@ export const zhTW: Dict = {
   'settings.agentInstall.stepSelect': '當代理顯示為已安裝後，選擇該代理卡片。',
   'settings.noAgentsDetected':
     '尚未偵測到任何代理。請安裝 Claude Code、Codex、Gemini CLI、OpenCode、Cursor Agent 或 Qwen 其中之一，然後點擊「重新掃描」。',
+  'settings.agentAuthRequired': '需要認證',
+  'settings.agentAuthUnknown': '認證狀態未知',
   'settings.apiSection': 'API 設定',
   'settings.quickFillProvider': '快速填入提供方',
   'settings.customProvider': '自訂提供方',
@@ -1344,6 +1346,7 @@ export const zhTW: Dict = {
   'settings.connectorsSaveKey': "儲存金鑰",
   'settings.connectorsSaveKeyTitle': "將此金鑰送往本機 daemon",
   'settings.connectorsKeySaving': "儲存中…",
+  'settings.connectorsKeySaved': "已儲存 ✓",
   'settings.connectorsKeyError': "儲存金鑰失敗。請確認本機 daemon 已啟動後再試。",
   'settings.connectorsHelpSaved': '你的金鑰會解鎖下方目錄，並保留在本機 daemon 中。貼上新金鑰可取代，或清除以移除。',
   'settings.connectorsHelpUnsaved': "尚未儲存 — 點擊「儲存金鑰」即可將其存入本機 daemon，並解鎖下方目錄。",

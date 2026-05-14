@@ -8,6 +8,11 @@ import {
 } from "react";
 import { useT } from '../i18n';
 import type { Dict } from '../i18n/types';
+import { useAnalytics } from '../analytics/provider';
+import {
+  trackStudioClickChatComposer,
+  trackStudioViewChatPanel,
+} from '../analytics/events';
 import { projectRawUrl, uploadProjectFiles, openFolderDialog } from "../providers/registry";
 import { patchProject } from "../state/projects";
 import { fetchMcpServers } from "../state/mcp";
@@ -25,6 +30,7 @@ import type {
   SkillSummary,
 } from "../types";
 import type { ConnectorDetail, ResearchOptions } from '@open-design/contracts';
+import { buildVisualAnnotationAttachment } from '../comments';
 import { Icon } from "./Icon";
 import { FacetModeChip } from "./FacetModeChip";
 import type { FacetSelection } from "./FacetParametersPanel";
@@ -180,8 +186,28 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     ref
   ) {
     const t = useT();
+    const analytics = useAnalytics();
     const [draft, setDraft] = useState(initialDraft ?? "");
+
+    // studio_view chat_panel — fire once per ChatComposer mount per project.
+    // The composer is the dominant chat surface; firing here keeps the
+    // event close to where the user actually sees the panel rather than at
+    // the higher-level ProjectView layer which mounts before the composer.
+    const studioViewFiredRef = useRef<string | null>(null);
+    useEffect(() => {
+      if (studioViewFiredRef.current === projectId) return;
+      studioViewFiredRef.current = projectId;
+      trackStudioViewChatPanel(analytics.track, {
+        page: 'studio',
+        area: 'chat_panel',
+        element: 'chat_tab',
+        view_type: 'panel',
+        source: 'open_project',
+        conversation_id: null,
+      });
+    }, [projectId, analytics.track]);
     const [staged, setStaged] = useState<ChatAttachment[]>([]);
+    const [stagedVisualComments, setStagedVisualComments] = useState<ChatCommentAttachment[]>([]);
     // Skills the user has @-mentioned for this turn. We dedupe on id and
     // strip the chip when the user removes the corresponding `@<skill>`
     // token from the draft, keeping draft and chips in sync.
@@ -531,10 +557,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     function reset() {
       setDraft("");
       setStaged([]);
+      setStagedVisualComments([]);
       setStagedSkills([]);
       setUploadError(null);
       setMention(null);
       setSlash(null);
+    }
+
+    function currentCommentAttachments(extra: ChatCommentAttachment[] = []): ChatCommentAttachment[] {
+      return [...commentAttachments, ...stagedVisualComments, ...extra];
     }
 
     function insertSkillMention(skill: SkillSummary) {
@@ -611,6 +642,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         if (!detail) return;
         void (async () => {
           let uploaded: ChatAttachment[] = [];
+          let visualAttachmentInput: Parameters<typeof buildVisualAnnotationAttachment>[0] | null = null;
+          let visualAttachment: ChatCommentAttachment | null = null;
           if (detail.file) {
             const id = await ensureProject();
             if (!id) return;
@@ -621,6 +654,40 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 uploaded = result.uploaded;
                 if (detail.action !== 'send') {
                   setStaged((s) => [...s, ...uploaded]);
+                }
+                const screenshot = uploaded[0];
+                if (screenshot && detail.markKind && detail.bounds) {
+                  visualAttachmentInput = {
+                    order: 1,
+                    idSeed: screenshot.path,
+                    screenshotPath: screenshot.path,
+                    markKind: detail.markKind,
+                    note: detail.note,
+                    bounds: detail.bounds,
+                    target: detail.target
+                      ? {
+                          filePath: detail.target.filePath || detail.filePath || screenshot.path,
+                          elementId: detail.target.elementId,
+                          selector: detail.target.selector,
+                          label: detail.target.label,
+                          text: detail.target.text,
+                          position: detail.target.position,
+                          htmlHint: detail.target.htmlHint,
+                        }
+                      : {
+                          filePath: detail.filePath || screenshot.path,
+                          position: detail.bounds,
+                        },
+                  };
+                  if (detail.action !== 'send') {
+                    setStagedVisualComments((current) => [
+                      ...current,
+                      buildVisualAnnotationAttachment({
+                        ...visualAttachmentInput!,
+                        order: commentAttachments.length + current.length + 1,
+                      }),
+                    ]);
+                  }
                 }
               }
               if (result.failed.length > 0) {
@@ -635,16 +702,32 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           if (detail.action === 'send') {
             if (streaming) {
               if (uploaded.length > 0) setStaged((s) => [...s, ...uploaded]);
+              if (visualAttachmentInput) {
+                setStagedVisualComments((current) => [
+                  ...current,
+                  buildVisualAnnotationAttachment({
+                    ...visualAttachmentInput!,
+                    order: commentAttachments.length + current.length + 1,
+                  }),
+                ]);
+              }
               if (detail.note) setDraft((d) => (d ? `${d}\n${detail.note}` : detail.note));
               textareaRef.current?.focus();
               return;
             }
+            if (visualAttachmentInput) {
+              visualAttachment = buildVisualAnnotationAttachment({
+                ...visualAttachmentInput,
+                order: commentAttachments.length + stagedVisualComments.length + 1,
+              });
+            }
             const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n');
             const attachments = [...staged, ...uploaded];
-            if (!prompt && attachments.length === 0 && commentAttachments.length === 0) return;
+            const nextCommentAttachments = currentCommentAttachments(visualAttachment ? [visualAttachment] : []);
+            if (!prompt && attachments.length === 0 && nextCommentAttachments.length === 0) return;
             const skillIds = stagedSkills.map((s) => s.id);
             const skillMeta = skillIds.length > 0 ? { skillIds } : undefined;
-            onSend(prompt, attachments, commentAttachments, skillMeta);
+            onSend(prompt, attachments, nextCommentAttachments, skillMeta);
             reset();
             return;
           }
@@ -657,7 +740,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       }
       window.addEventListener(ANNOTATION_EVENT, onAnnotation);
       return () => window.removeEventListener(ANNOTATION_EVENT, onAnnotation);
-    }, [commentAttachments, draft, onSend, projectId, staged, stagedSkills, streaming]);
+    }, [commentAttachments, draft, onSend, projectId, staged, stagedSkills, stagedVisualComments, streaming]);
 
     function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
       const items = Array.from(e.clipboardData?.items ?? []);
@@ -769,6 +852,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
 
     function removeStaged(p: string) {
       setStaged((s) => s.filter((a) => a.path !== p));
+      setStagedVisualComments((current) => current.filter((attachment) => attachment.screenshotPath !== p));
+    }
+
+    function removeCommentAttachment(id: string) {
+      setStagedVisualComments((current) => current.filter((attachment) => attachment.id !== id));
+      if (!stagedVisualComments.some((attachment) => attachment.id === id)) {
+        onRemoveCommentAttachment?.(id);
+      }
     }
 
     async function submit() {
@@ -785,24 +876,25 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       const skillIds = stagedSkills.map((s) => s.id);
       const skillMeta = skillIds.length > 0 ? { skillIds } : undefined;
       const hatched = expandHatchCommand(prompt);
+      const nextCommentAttachments = currentCommentAttachments();
       if (hatched) {
         if (streaming) return;
-        onSend(hatched, staged, commentAttachments, skillMeta);
+        onSend(hatched, staged, nextCommentAttachments, skillMeta);
         reset();
         return;
       }
       const search = researchAvailable ? expandSearchCommand(prompt) : null;
       if (search) {
         if (streaming) return;
-        onSend(search.prompt, staged, commentAttachments, {
+        onSend(search.prompt, staged, nextCommentAttachments, {
           ...skillMeta,
           research: { enabled: true, query: search.query },
         });
         reset();
         return;
       }
-      if ((!prompt && commentAttachments.length === 0) || streaming) return;
-      onSend(prompt, staged, commentAttachments, skillMeta);
+      if ((!prompt && nextCommentAttachments.length === 0) || streaming) return;
+      onSend(prompt, staged, nextCommentAttachments, skillMeta);
       reset();
     }
 
@@ -889,10 +981,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               ))}
             </div>
           ) : null}
-          {commentAttachments.length > 0 ? (
+          {currentCommentAttachments().length > 0 ? (
             <StagedCommentAttachments
-              attachments={commentAttachments}
-              onRemove={(id) => onRemoveCommentAttachment?.(id)}
+              attachments={currentCommentAttachments()}
+              onRemove={removeCommentAttachment}
               t={t}
             />
           ) : null}
@@ -900,6 +992,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
             <textarea
               ref={textareaRef}
               data-testid="chat-composer-input"
+              // ph-no-capture: prompt content is the most sensitive
+              // surface in the product. PostHog autocapture skips this
+              // element + subtree entirely.
+              className="ph-no-capture"
               value={draft}
               placeholder={t('chat.composerPlaceholder')}
               onChange={handleChange}
@@ -1127,7 +1223,17 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
             <button
               className="icon-btn"
               data-testid="chat-attach"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                trackStudioClickChatComposer(analytics.track, {
+                  page: 'studio',
+                  area: 'chat_composer',
+                  element: 'attachment_button',
+                  action: 'click_composer_control',
+                  user_query_tokens: Math.ceil(draft.length / 4),
+                  has_attachment: staged.length > 0 || commentAttachments.length > 0,
+                });
+                fileInputRef.current?.click();
+              }}
               title={t('chat.attachTitle')}
               disabled={uploading}
               aria-label={t('chat.attachAria')}
@@ -1153,8 +1259,19 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 type="button"
                 className="composer-send"
                 data-testid="chat-send"
-                onClick={() => void submit()}
-                disabled={sendDisabled || (!draft.trim() && commentAttachments.length === 0)}
+                onClick={() => {
+                  trackStudioClickChatComposer(analytics.track, {
+                    page: 'studio',
+                    area: 'chat_composer',
+                    element: 'send_button',
+                    action: 'click_composer_control',
+                    user_query_tokens: Math.ceil(draft.length / 4),
+                    has_attachment:
+                      staged.length > 0 || currentCommentAttachments().length > 0,
+                  });
+                  void submit();
+                }}
+                disabled={sendDisabled || (!draft.trim() && currentCommentAttachments().length === 0)}
               >
                 <Icon name="send" size={13} />
                 <span>{t('chat.send')}</span>
@@ -1314,12 +1431,14 @@ function StagedCommentAttachments({
   onRemove: (id: string) => void;
   t: TranslateFn;
 }) {
+  const visibleAttachments = attachments.filter((attachment) => attachment.selectionKind !== 'visual');
+  if (visibleAttachments.length === 0) return null;
   return (
     <div className="staged-row comment-staged-row" data-testid="staged-comment-attachments">
-      {attachments.map((a) => (
+      {visibleAttachments.map((a) => (
         <div key={a.id} className="staged-chip staged-comment">
-          <span className="staged-name" title={`${a.elementId}: ${a.comment}`}>
-            <strong>{a.elementId}</strong>
+          <span className="staged-name" title={`${a.screenshotPath ? `${a.screenshotPath}: ` : ''}${a.elementId}: ${a.comment}`}>
+            <strong>{a.selectionKind === 'visual' ? 'Visual mark' : a.elementId}</strong>
             <span>{a.comment}</span>
           </span>
           <button

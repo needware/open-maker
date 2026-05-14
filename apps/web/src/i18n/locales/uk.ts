@@ -97,6 +97,8 @@ export const uk: Dict = {
   'settings.agentInstall.stepSelect': 'Виберіть картку агента, коли він з\'явиться як встановлений.',
   'settings.noAgentsDetected':
     'Агентів ще не виявлено. Встановіть один з: Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen або GitHub Copilot CLI, а потім натисніть Переканувати.',
+  'settings.agentAuthRequired': 'Потрібна автентифікація',
+  'settings.agentAuthUnknown': 'Стан автентифікації невідомий',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'Швидко заповнити провайдера',
   'settings.customProvider': 'Власний провайдер',
@@ -1256,6 +1258,7 @@ export const uk: Dict = {
   'settings.connectorsSaveKey': "Зберегти ключ",
   'settings.connectorsSaveKeyTitle': "Надіслати цей ключ локальному демону",
   'settings.connectorsKeySaving': "Збереження…",
+  'settings.connectorsKeySaved': "Збережено ✓",
   'settings.connectorsKeyError': "Не вдалося зберегти ключ. Перевірте, чи запущено локальний демон, і спробуйте ще раз.",
   'settings.connectorsHelpSaved': 'Ваш ключ відкриває каталог нижче й залишається в локальному daemon. Вставте новий ключ, щоб замінити його, або очистіть, щоб видалити.',
   'settings.connectorsHelpUnsaved': "Незбережені зміни — натисніть «Зберегти ключ», щоб надіслати ці дані локальному демону і відкрити каталог нижче.",

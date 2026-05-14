@@ -96,6 +96,8 @@ export const ko: Dict = {
   'settings.agentInstall.stepSelect': '설치됨으로 표시되면 해당 에이전트 카드를 선택하세요.',
   'settings.noAgentsDetected':
     '에이전트가 감지되지 않았습니다. Claude Code, Codex, Devin for Terminal, Gemini CLI, OpenCode, Cursor Agent, Qwen 또는 GitHub Copilot CLI 중 하나를 설치한 후 다시 스캔을 클릭하세요.',
+  'settings.agentAuthRequired': '인증 필요',
+  'settings.agentAuthUnknown': '인증 상태를 알 수 없음',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': '제공자 빠른 입력',
   'settings.customProvider': '사용자 지정 제공자',
@@ -1255,6 +1257,7 @@ export const ko: Dict = {
   'settings.connectorsSaveKey': "키 저장",
   'settings.connectorsSaveKeyTitle': "이 키를 로컬 데몬으로 전송",
   'settings.connectorsKeySaving': "저장 중…",
+  'settings.connectorsKeySaved': "저장됨 ✓",
   'settings.connectorsKeyError': "키를 저장하지 못했습니다. 로컬 데몬이 실행 중인지 확인한 뒤 다시 시도하세요.",
   'settings.connectorsHelpSaved': '키가 아래 카탈로그를 열며 로컬 daemon에 유지됩니다. 교체하려면 새 키를 붙여넣고, 제거하려면 지우세요.',
   'settings.connectorsHelpUnsaved': "저장되지 않은 변경사항 — 「키 저장」을 눌러 이 자격 정보를 로컬 데몬에 저장하고 아래 카탈로그를 해제하세요.",

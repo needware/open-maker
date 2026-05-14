@@ -96,6 +96,8 @@ export const ar: Dict = {
   'settings.agentInstall.stepSelect': 'اختر بطاقة الوكيل عندما يظهر كأنه مثبت.',
   'settings.noAgentsDetected':
     'لم يتم اكتشاف أي وكلاء بعد. قم بتثبيت Claude Code أو Codex أو Devin أو Gemini CLI أو OpenCode أو Cursor Agent أو Qwen أو GitHub Copilot CLI، ثم اضغط على إعادة المسح.',
+  'settings.agentAuthRequired': 'المصادقة مطلوبة',
+  'settings.agentAuthUnknown': 'حالة المصادقة غير معروفة',
   'settings.apiSection': 'Anthropic API',
   'settings.quickFillProvider': 'ملء المزوّد سريعًا',
   'settings.customProvider': 'مزوّد مخصص',
@@ -1214,6 +1216,7 @@ export const ar: Dict = {
   'settings.connectorsSaveKey': "حفظ المفتاح",
   'settings.connectorsSaveKeyTitle': "إرسال هذا المفتاح إلى الـ daemon المحلي",
   'settings.connectorsKeySaving': "جارٍ الحفظ…",
+  'settings.connectorsKeySaved': "تم الحفظ ✓",
   'settings.connectorsKeyError': "تعذّر حفظ المفتاح. تأكد أن الـ daemon المحلي يعمل ثم حاول مرة أخرى.",
   'settings.connectorsHelpSaved': 'يفتح مفتاحك الكتالوج أدناه ويبقى في daemon المحلي. الصق مفتاحًا جديدًا لاستبداله أو امسحه لإزالته.',
   'settings.connectorsHelpUnsaved': "تغييرات غير محفوظة — اضغط على \"حفظ المفتاح\" لتخزين بيانات الاعتماد في الـ daemon المحلي وفتح الكتالوج أدناه.",
