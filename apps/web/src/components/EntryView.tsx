@@ -29,7 +29,6 @@ import { PetRail } from './pet/PetRail';
 import { PromptTemplatePreviewModal } from './PromptTemplatePreviewModal';
 import { PromptTemplatesTab } from './PromptTemplatesTab';
 import { apiProtocolLabel } from '../utils/apiProtocol';
-import { AppChromeHeader, SettingsIconButton } from './AppChromeHeader';
 
 type TopTab = 'workspace' | 'examples' | 'design-systems' | 'image-templates' | 'video-templates';
 
