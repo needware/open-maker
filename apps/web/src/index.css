@@ -4097,7 +4097,7 @@ code {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding-top: 24px;
+  padding-top: 12px;
 }
 .newproj-tabs-shell {
   position: relative;
@@ -4174,7 +4174,7 @@ code {
 .newproj-tab {
   flex: 0 0 auto;
   min-width: max-content;
-  padding: 7px 14px;
+  padding: 5px 12px;
   background: transparent;
   font-size: 12px;
   color: var(--text-muted);
@@ -4213,16 +4213,26 @@ code {
   border-bottom-color: var(--bg-panel);
   z-index: 3;
 }
+.newproj-footer {
+  padding: 6px 16px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  flex: 0 0 auto;
+  /* Sits a fixed, tight distance below the body card. Visible card→text
+     gap = padding-top (6). */
+  margin-top: 0;
+}
 .newproj-body {
-  margin: 0 24px;
-  padding: 16px 18px 12px;
+  margin: 0 16px;
+  padding: 10px 14px 10px;
   border: 1px solid var(--border);
   border-radius: 0 0 12px 12px;
   background: var(--bg-panel);
   box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   /* The parent `.newproj` is `overflow: hidden`; the card needs to be the
      scroll container so taller form variants (image/media tabs, validation
      messages, compact-height windows) stay reachable inside the sidebar.
@@ -4285,7 +4295,7 @@ code {
 .newproj-media-options {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 .newproj-media-field,
 .newproj-media-options .newproj-label {

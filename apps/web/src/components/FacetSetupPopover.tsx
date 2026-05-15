@@ -15,6 +15,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import type { ConnectorDetail } from '@open-design/contracts';
+import { useT } from '../i18n';
 import type {
   DesignSystemSummary,
   MediaProviderCredentials,
@@ -103,6 +104,7 @@ export function FacetSetupPopover({
   onChange,
   onClose,
 }: Props) {
+  const t = useT();
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -126,33 +128,39 @@ export function FacetSetupPopover({
     };
   }, []);
 
-  // Width of the panel: wide enough to host the original two-column
-  // skill grid, design-system picker, and media options without
-  // horizontal cramping. Height is capped to leave breathing room
-  // above/below the composer; the inner panel scrolls when content
-  // overflows.
-  const PANEL_W = 560;
-
   // The chip lives in the composer near the bottom of the viewport, so
   // we want the popover to open *upward* whenever the space above is
   // larger than below. We size `maxHeight` to whichever side we pick so
-  // the panel never clips off-screen — earlier the height was a fixed
-  // 720 and only the position flipped, which made a short space-above
-  // wrongly fall back to "below" and overflow the viewport.
+  // the panel never clips off-screen.
   const viewportH = typeof window === 'undefined' ? 720 : window.innerHeight;
   const viewportW = typeof window === 'undefined' ? 1024 : window.innerWidth;
-  const GAP = 8;
-  const MARGIN = 8;
+  // Trimmed from GAP=8 / MARGIN=12 so the popover can extend closer to
+  // the chip and to the viewport edge — every pixel here translates 1:1
+  // into how tall PANEL_MAX_H can grow before being clipped.
+  const GAP = 4;
+  const MARGIN = 4;
+  const PANEL_W = Math.min(480, viewportW - MARGIN * 2);
   const spaceAbove = Math.max(0, anchorRect.top - GAP - MARGIN);
   const spaceBelow = Math.max(0, viewportH - anchorRect.bottom - GAP - MARGIN);
   const placeAbove = spaceAbove >= spaceBelow;
-  const PANEL_MAX_H = Math.min(720, placeAbove ? spaceAbove : spaceBelow);
+  // Let the popover grow to fill almost the entire viewport on tall
+  // screens — capped at 96% of viewport height so it still has a hair
+  // of breathing room top/bottom. The inner content scrolls when it
+  // exceeds this, so a generous cap just buys more visible rows.
+  const PANEL_MAX_H = Math.min(
+    Math.floor(viewportH * 0.96),
+    placeAbove ? spaceAbove : spaceBelow,
+  );
 
   const left = useMemo(
-    () => Math.max(MARGIN, Math.min(anchorRect.left, viewportW - PANEL_W - MARGIN)),
-    [anchorRect.left, viewportW],
+    () => {
+      const preferredLeft = anchorRect.left + anchorRect.width / 2 - PANEL_W / 2;
+      return Math.max(MARGIN, Math.min(preferredLeft, viewportW - PANEL_W - MARGIN));
+    },
+    [anchorRect.left, anchorRect.width, PANEL_W, viewportW],
   );
-  const top = placeAbove ? anchorRect.top - PANEL_MAX_H - GAP : anchorRect.bottom + GAP;
+  const top = placeAbove ? undefined : anchorRect.bottom + GAP;
+  const bottom = placeAbove ? viewportH - anchorRect.top + GAP : undefined;
 
   return (
     <div
@@ -164,8 +172,14 @@ export function FacetSetupPopover({
         position: 'fixed',
         left,
         top,
+        bottom,
         zIndex: 1500,
         width: PANEL_W,
+        // Fixed visible height so the popover looks substantial even
+        // when the active tab's form is short (e.g. Prototype with just
+        // design-system + fidelity). Clamped to PANEL_MAX_H so it still
+        // collapses gracefully on small viewports.
+        height: Math.min(PANEL_MAX_H, 560),
         maxHeight: PANEL_MAX_H,
         background: 'var(--surface, #fff)',
         border: '1px solid var(--border-soft)',
@@ -191,6 +205,7 @@ export function FacetSetupPopover({
         onOpenConnectorsTab={onOpenConnectorsTab}
         onChange={onChange}
       />
+      <div className="newproj-footer">{t('newproj.privacyFooter')}</div>
     </div>
   );
 }

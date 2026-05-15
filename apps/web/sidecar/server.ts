@@ -50,6 +50,12 @@ type NextApp = {
   prepare(): Promise<void>;
 };
 
+type NextAppOptions = {
+  dev: boolean;
+  dir: string;
+  webpack?: boolean;
+};
+
 type StandaloneBackend = {
   exitReason(): string | null;
   isRunning(): boolean;
@@ -57,8 +63,8 @@ type StandaloneBackend = {
   stop(): Promise<void>;
 };
 
-function createNextApp(options: { dev: boolean; dir: string }): NextApp {
-  const createNextServer = require("next") as (nextOptions: { dev: boolean; dir: string }) => NextApp;
+function createNextApp(options: NextAppOptions): NextApp {
+  const createNextServer = require("next") as (nextOptions: NextAppOptions) => NextApp;
   return createNextServer(options);
 }
 
@@ -618,7 +624,15 @@ async function startRegularNextSidecar(
   runtime: SidecarRuntimeContext<SidecarStamp>,
   webRoot: string,
 ): Promise<WebSidecarHandle> {
-  const app = createNextApp({ dev: process.env.OD_WEB_PROD !== "1" && runtime.mode === "dev", dir: webRoot });
+  const dev = process.env.OD_WEB_PROD !== "1" && runtime.mode === "dev";
+  const app = createNextApp({
+    dev,
+    dir: webRoot,
+    // Next 16 defaults dev servers to Turbopack. In tools-dev we place
+    // distDir under the workspace `.tmp/` runtime tree, and Turbopack's
+    // workspace-root graph can retain that generated output until OOM.
+    webpack: dev ? true : undefined,
+  });
   await prepareNextApp(app, webRoot);
 
   const daemonOrigin = resolveDaemonOrigin();

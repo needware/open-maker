@@ -15,7 +15,7 @@
 //   - "Privacy footer" string (rendered elsewhere now)
 // Everything else — including all helper sub-components — is preserved
 // so the per-tab operation panel reads identically to the old form.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ConnectorDetail, ImportFolderResponse } from '@open-design/contracts';
 
 import { useT } from '../i18n';
@@ -91,6 +91,126 @@ type PromptTemplatePick = {
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
 
+// Target-platforms picker domain. Ported from the pre-RFC NewProjectPanel so
+// the facet popover can drive `metadata.platform` / `metadata.platformTargets`
+// alongside the existing per-facet controls. `auto` is a daemon-side
+// "decide for me" value; the panel surfaces only concrete targets.
+type NewProjectPlatform = Exclude<ProjectPlatform, 'auto'>;
+
+const DESIGN_PLATFORMS: Array<{
+  value: NewProjectPlatform;
+  labelKey: keyof Dict;
+  hintKey: keyof Dict;
+}> = [
+  {
+    value: 'responsive',
+    labelKey: 'newproj.platform.responsive.label',
+    hintKey: 'newproj.platform.responsive.hint',
+  },
+  {
+    value: 'web-desktop',
+    labelKey: 'newproj.platform.webDesktop.label',
+    hintKey: 'newproj.platform.webDesktop.hint',
+  },
+  {
+    value: 'mobile-ios',
+    labelKey: 'newproj.platform.mobileIos.label',
+    hintKey: 'newproj.platform.mobileIos.hint',
+  },
+  {
+    value: 'mobile-android',
+    labelKey: 'newproj.platform.mobileAndroid.label',
+    hintKey: 'newproj.platform.mobileAndroid.hint',
+  },
+  {
+    value: 'tablet',
+    labelKey: 'newproj.platform.tablet.label',
+    hintKey: 'newproj.platform.tablet.hint',
+  },
+  {
+    value: 'desktop-app',
+    labelKey: 'newproj.platform.desktopApp.label',
+    hintKey: 'newproj.platform.desktopApp.hint',
+  },
+];
+
+function normalizeSelectedPlatforms(
+  platforms: NewProjectPlatform[],
+): NewProjectPlatform[] {
+  const seen = new Set<NewProjectPlatform>();
+  for (const platform of platforms) {
+    if (DESIGN_PLATFORMS.some((option) => option.value === platform)) {
+      seen.add(platform);
+    }
+  }
+  return seen.size > 0 ? [...seen] : ['responsive'];
+}
+
+function platformTargetsSupportOsWidgets(
+  platforms: ProjectPlatform[] | NewProjectPlatform[],
+): boolean {
+  return platforms.some(
+    (platform) =>
+      platform === 'mobile-ios' ||
+      platform === 'mobile-android' ||
+      platform === 'tablet',
+  );
+}
+
+function platformTargetsFor(
+  platforms: NewProjectPlatform[],
+): ProjectPlatform[] {
+  const targets = new Set<ProjectPlatform>();
+  for (const platform of platforms) {
+    switch (platform) {
+      case 'responsive':
+        targets.add('responsive');
+        break;
+      case 'web-desktop':
+        targets.add('web-desktop');
+        break;
+      case 'mobile-ios':
+        targets.add('mobile-ios');
+        break;
+      case 'mobile-android':
+        targets.add('mobile-android');
+        break;
+      case 'tablet':
+        targets.add('tablet');
+        break;
+      case 'desktop-app':
+        targets.add('desktop-app');
+        break;
+      default: {
+        const exhaustive: never = platform;
+        targets.add(exhaustive);
+      }
+    }
+  }
+  return targets.size > 0 ? [...targets] : ['responsive'];
+}
+
+// Best-effort hydration of `platformTargets` state from existing project
+// metadata. Reads `platformTargets` first (the precise field set), then
+// falls back to the singular `platform`. `auto` is treated as "no
+// explicit pick" and resolves to the default `['responsive']`.
+function hydratePlatformTargets(
+  metadata: ProjectMetadata | undefined,
+): NewProjectPlatform[] {
+  const targets = metadata?.platformTargets;
+  if (targets && targets.length > 0) {
+    const filtered = targets.filter(
+      (p): p is NewProjectPlatform => p !== 'auto',
+    );
+    if (filtered.length > 0) return normalizeSelectedPlatforms(filtered);
+  }
+  const primary = metadata?.platform;
+  if (primary && primary !== 'auto') {
+    return normalizeSelectedPlatforms([primary]);
+  }
+  return ['responsive'];
+}
+
 // CreateTab is a UI-only enum: it defines the eight tabs in the
 // FacetSetupPopover. `live-artifact` and `other` are *not* contract
 // FacetMode values — they're surfaced as separate tabs but resolve to
@@ -119,6 +239,10 @@ const FACET_PANEL_OWNED_KEYS = new Set<keyof ProjectMetadata>([
   'fidelity',
   'speakerNotes',
   'animations',
+  'platform',
+  'platformTargets',
+  'includeLandingPage',
+  'includeOsWidgets',
   'templateId',
   'templateLabel',
   'imageModel',
@@ -234,7 +358,11 @@ interface Props {
   designSystems: DesignSystemSummary[];
   defaultDesignSystemId: string | null;
   templates: ProjectTemplate[];
-  onDeleteTemplate: (id: string) => Promise<boolean>;
+  /** Optional. When omitted (e.g. the FacetSetupPopover surface that
+   *  edits an existing project's parameters), TemplatePicker hides its
+   *  delete affordance — template management lives in Settings, not in
+   *  the popover. */
+  onDeleteTemplate?: (id: string) => Promise<boolean>;
   promptTemplates: PromptTemplateSummary[];
   // Initial / current selection. The panel uses these on first render
   // and to drive the active tab; subsequent changes flow back via
@@ -341,6 +469,18 @@ export function FacetParametersPanel({
   );
   const [animations, setAnimations] = useState(
     currentMetadata?.animations ?? false,
+  );
+  // Target platforms — multi-select. `auto` is filtered out at hydration
+  // time so the picker always shows concrete picks. Empty arrays are
+  // normalized to `['responsive']` by normalizeSelectedPlatforms.
+  const [platformTargets, setPlatformTargets] = useState<NewProjectPlatform[]>(
+    () => hydratePlatformTargets(currentMetadata),
+  );
+  const [includeLandingPage, setIncludeLandingPage] = useState(
+    currentMetadata?.includeLandingPage ?? false,
+  );
+  const [includeOsWidgets, setIncludeOsWidgets] = useState(
+    currentMetadata?.includeOsWidgets ?? false,
   );
   const [templateId, setTemplateId] = useState<string | null>(
     currentMetadata?.templateId ?? null,
@@ -471,6 +611,24 @@ export function FacetParametersPanel({
   }, [tab, skills]);
   const showDesignSystemPicker =
     tabSupportsDesignSystem && !tabDefaultSkillForcesNoDs;
+  // Target platforms + Companion surfaces apply to the same four
+  // structured/visual tabs as the legacy NewProjectPanel: Prototype,
+  // Live artifact, From template, and Other. Media tabs (image/video/
+  // audio) produce non-canvas artifacts where "responsive web vs iOS"
+  // has no rendering meaning.
+  const tabSupportsPlatform =
+    tab === 'prototype' ||
+    tab === 'live-artifact' ||
+    tab === 'template' ||
+    tab === 'other';
+  const concretePlatformTargets = useMemo(
+    () => platformTargetsFor(normalizeSelectedPlatforms(platformTargets)),
+    [platformTargets],
+  );
+  const canIncludeOsWidgets = useMemo(
+    () => platformTargetsSupportOsWidgets(concretePlatformTargets),
+    [concretePlatformTargets],
+  );
 
   useEffect(() => {
     if (dsSelectionTouched) return;
@@ -566,6 +724,9 @@ export function FacetParametersPanel({
       fidelity,
       speakerNotes,
       animations,
+      platformTargets,
+      includeLandingPage,
+      includeOsWidgets,
       templateId,
       templates,
       imageModel,
@@ -592,6 +753,9 @@ export function FacetParametersPanel({
     fidelity,
     speakerNotes,
     animations,
+    platformTargets,
+    includeLandingPage,
+    includeOsWidgets,
     templateId,
     templates,
     imageModel,
@@ -678,6 +842,23 @@ export function FacetParametersPanel({
           />
         ) : null}
 
+        {tabSupportsPlatform ? (
+          <PlatformPicker
+            value={platformTargets}
+            onChange={setPlatformTargets}
+          />
+        ) : null}
+
+        {tabSupportsPlatform ? (
+          <SurfaceOptions
+            includeLandingPage={includeLandingPage}
+            includeOsWidgets={includeOsWidgets}
+            canIncludeOsWidgets={canIncludeOsWidgets}
+            onIncludeLandingPage={setIncludeLandingPage}
+            onIncludeOsWidgets={setIncludeOsWidgets}
+          />
+        ) : null}
+
         {tab === 'image' ? (
           <PromptTemplatePicker
             surface="image"
@@ -695,12 +876,6 @@ export function FacetParametersPanel({
             onChange={handleVideoPromptTemplate}
           />
         ) : null}
-
-        {/* Platform-targets + surface-options pickers were removed when the
-            old NewProjectPanel was retired; they relied on PlatformPicker /
-            SurfaceOptions / DESIGN_PLATFORMS that never got ported into
-            FacetParametersPanel. Re-introduce when the responsive-handoff
-            feature (PR #1224) gets re-implemented on the new panel surface. */}
 
         {/* Live artifact always renders at high fidelity — its whole point
             is data-bound polished UI, so the wireframe option is hidden. */}
@@ -978,6 +1153,217 @@ function HighFidelityArt() {
   );
 }
 
+/* ============================================================
+   PlatformPicker — multi-select target platforms.
+   Mirrors the visual language of the design-system trigger card so a
+   user scanning the panel reads them as the same kind of control.
+   Defaults to `['responsive']` when emptied; the panel never stores an
+   empty selection.
+   ============================================================ */
+function PlatformPicker({
+  value,
+  onChange,
+}: {
+  value: NewProjectPlatform[];
+  onChange: (v: NewProjectPlatform[]) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const listboxId = useId();
+
+  function togglePlatform(next: NewProjectPlatform) {
+    const active = value.includes(next);
+    const updated = active
+      ? value.filter((item) => item !== next)
+      : [...value, next];
+    onChange(updated.length > 0 ? updated : ['responsive']);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(e: MouseEvent) {
+      if (wrapRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    const tid = window.setTimeout(() => {
+      document.addEventListener('mousedown', onPointer);
+      document.addEventListener('keydown', onKey);
+    }, 0);
+    return () => {
+      window.clearTimeout(tid);
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const primary =
+    DESIGN_PLATFORMS.find((o) => o.value === value[0]) ?? null;
+  const extraCount = Math.max(0, value.length - 1);
+
+  return (
+    <div
+      className="newproj-section ds-picker platform-picker"
+      data-testid="platform-picker"
+      ref={wrapRef}
+    >
+      <label className="newproj-label">Target platforms</label>
+      <button
+        type="button"
+        data-testid="platform-picker-trigger"
+        className={`ds-picker-trigger${open ? ' open' : ''}${primary ? '' : ' empty'}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+      >
+        <span className="ds-picker-meta">
+          <span className="ds-picker-title">
+            {primary ? t(primary.labelKey) : 'Pick a platform'}
+            {extraCount > 0 ? (
+              <span className="ds-picker-extra-pill">+{extraCount}</span>
+            ) : null}
+          </span>
+        </span>
+        <Icon
+          name="chevron-down"
+          size={14}
+          className="ds-picker-chevron"
+          style={{ transform: open ? 'rotate(180deg)' : undefined }}
+        />
+      </button>
+      {open ? (
+        <div
+          className="ds-picker-popover"
+          id={listboxId}
+          role="listbox"
+          aria-label="Target platforms"
+          aria-multiselectable="true"
+        >
+          <div className="ds-picker-list">
+            {DESIGN_PLATFORMS.map((option) => {
+              const active = value.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  className={`ds-picker-item${active ? ' active' : ''}`}
+                  onClick={() => togglePlatform(option.value)}
+                >
+                  <span className="ds-picker-item-text">
+                    <span className="ds-picker-item-title">
+                      {t(option.labelKey)}
+                    </span>
+                    <span className="ds-picker-item-sub">
+                      {t(option.hintKey)}
+                    </span>
+                  </span>
+                  <span
+                    className={`ds-picker-mark check${active ? ' active' : ''}`}
+                    aria-hidden
+                  >
+                    {active ? '✓' : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
+   SurfaceOptions — Companion-surfaces toggles.
+   - Include landing page: a marketing/onboarding surface paired with
+     the main product.
+   - Include OS widgets: native widgets/complications that the agent
+     should design alongside the app. Disabled when no mobile/tablet
+     target is picked — desktop-web surfaces don't have an OS widget
+     story.
+   ============================================================ */
+function SurfaceOptions({
+  includeLandingPage,
+  includeOsWidgets,
+  canIncludeOsWidgets,
+  onIncludeLandingPage,
+  onIncludeOsWidgets,
+}: {
+  includeLandingPage: boolean;
+  includeOsWidgets: boolean;
+  canIncludeOsWidgets: boolean;
+  onIncludeLandingPage: (v: boolean) => void;
+  onIncludeOsWidgets: (v: boolean) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="newproj-section surface-options">
+      <label className="newproj-label">
+        {t('newproj.surfaceOptionsLabel')}
+      </label>
+      <div className="compact-toggle-list">
+        <CompactToggle
+          label={t('newproj.includeLandingPage')}
+          hint={t('newproj.includeLandingPageHint')}
+          checked={includeLandingPage}
+          onChange={onIncludeLandingPage}
+        />
+        <CompactToggle
+          label={t('newproj.includeOsWidgets')}
+          hint={
+            canIncludeOsWidgets
+              ? t('newproj.includeOsWidgetsHint')
+              : t('newproj.includeOsWidgetsDisabledHint')
+          }
+          checked={includeOsWidgets && canIncludeOsWidgets}
+          disabled={!canIncludeOsWidgets}
+          onChange={onIncludeOsWidgets}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Lightweight inline toggle row used by SurfaceOptions. Hint becomes a
+// native tooltip so the row stays one line tall — keeps the surface
+// secondary controls visually subordinate to the full ToggleRow card
+// used for primary toggles (speaker notes, animations).
+function CompactToggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`compact-toggle${checked ? ' on' : ''}${disabled ? ' disabled' : ''}`}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
+      aria-pressed={checked}
+      disabled={disabled}
+      title={hint}
+    >
+      <span className="compact-toggle-label">{label}</span>
+      <span className="compact-toggle-switch" aria-hidden />
+    </button>
+  );
+}
+
 function ToggleRow({
   label,
   hint,
@@ -1017,7 +1403,7 @@ function TemplatePicker({
   templates: ProjectTemplate[];
   value: string | null;
   onChange: (id: string | null) => void;
-  onDelete: (id: string) => Promise<boolean>;
+  onDelete?: (id: string) => Promise<boolean>;
 }) {
   const t = useT();
   return (
@@ -1045,10 +1431,14 @@ function TemplatePicker({
                 key={tpl.id}
                 active={value === tpl.id}
                 onClick={() => onChange(tpl.id)}
-                onDelete={async () => {
-                  const ok = await onDelete(tpl.id);
-                  if (ok && value === tpl.id) onChange(null);
-                }}
+                onDelete={
+                  onDelete
+                    ? async () => {
+                        const ok = await onDelete(tpl.id);
+                        if (ok && value === tpl.id) onChange(null);
+                      }
+                    : undefined
+                }
                 name={tpl.name}
                 description={tpl.description ?? fallbackDesc}
               />
@@ -1365,7 +1755,10 @@ function TemplateOption({
 }: {
   active: boolean;
   onClick: () => void;
-  onDelete: () => void;
+  /** When omitted the delete affordance is hidden — used by the
+   *  FacetSetupPopover surface where template management belongs in
+   *  Settings, not in a per-facet parameter sheet. */
+  onDelete?: () => void;
   name: string;
   description: string;
 }) {
@@ -1383,15 +1776,17 @@ function TemplateOption({
           <span className="template-option-desc">{description}</span>
         </span>
       </button>
-      <button
-        type="button"
-        className="template-option-delete"
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        title="Delete template"
-        aria-label={`Delete template ${name}`}
-      >
-        ✕
-      </button>
+      {onDelete ? (
+        <button
+          type="button"
+          className="template-option-delete"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="Delete template"
+          aria-label={`Delete template ${name}`}
+        >
+          ✕
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -2190,6 +2585,9 @@ function buildMetadata(input: {
   fidelity: 'wireframe' | 'high-fidelity';
   speakerNotes: boolean;
   animations: boolean;
+  platformTargets: NewProjectPlatform[];
+  includeLandingPage: boolean;
+  includeOsWidgets: boolean;
   templateId: string | null;
   templates: ProjectTemplate[];
   imageModel: string;
@@ -2209,12 +2607,25 @@ function buildMetadata(input: {
   // marker so downstream consumers that only branch on kind keep working.
   const kind: ProjectKind =
     input.tab === 'live-artifact' ? 'prototype' : input.tab;
-  // `base` previously carried platform / platformTargets / landingPage /
-  // osWidgets from the platform picker; those fields were dropped along
-  // with the PlatformPicker/SurfaceOptions removal above and consumers
-  // (ProjectView header chips) already read them through optional chaining,
-  // so absence is benign. Restore when PR #1224's feature is re-ported.
-  const base = {};
+  // Platform + companion-surface metadata. `selectedPlatforms[0]` is the
+  // primary target (e.g. used by the chip in ProjectView's header);
+  // `concreteTargets` is the full delivery surface set the agent must
+  // account for. `includeOsWidgets` is silently dropped when no picked
+  // platform supports it, matching the picker's disabled-state UX.
+  const selectedPlatforms = normalizeSelectedPlatforms(input.platformTargets);
+  const concreteTargets = platformTargetsFor(selectedPlatforms);
+  const canIncludeOsWidgets = platformTargetsSupportOsWidgets(concreteTargets);
+  const surfaceOptions = {
+    ...(input.includeLandingPage ? { includeLandingPage: true } : {}),
+    ...(input.includeOsWidgets && canIncludeOsWidgets
+      ? { includeOsWidgets: true }
+      : {}),
+  };
+  const base = {
+    platform: selectedPlatforms[0],
+    platformTargets: concreteTargets,
+    ...surfaceOptions,
+  };
   const inspirations = input.inspirationIds.length > 0
     ? { inspirationDesignSystemIds: input.inspirationIds }
     : {};

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, mkdir, open, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
+import { lstat, mkdir, open, readlink, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
 import path from "node:path";
 
 import { cac } from "cac";
@@ -499,7 +499,13 @@ async function ensureWebDevNodeModules(config: ToolDevConfig): Promise<void> {
 
   await mkdir(webRuntimeRoot, { recursive: true });
   const current = await lstat(runtimeNodeModules).catch(() => null);
-  if (current?.isSymbolicLink()) return;
+  if (current?.isSymbolicLink()) {
+    const target = await readlink(runtimeNodeModules).catch(() => null);
+    const resolvedTarget = target == null
+      ? null
+      : path.resolve(path.dirname(runtimeNodeModules), target);
+    if (resolvedTarget === webNodeModules) return;
+  }
   if (current != null) await rm(runtimeNodeModules, { force: true, recursive: true });
   await symlink(webNodeModules, runtimeNodeModules, "junction");
 }
