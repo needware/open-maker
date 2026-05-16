@@ -1519,6 +1519,15 @@ export interface Dict {
   'pet.subtitle': string;
   'pet.navTitle': string;
   'pet.navHint': string;
+  'pet.railAria': string;
+  'pet.railTitle': string;
+  'pet.railHint': string;
+  'pet.railExpand': string;
+  'pet.railCollapse': string;
+  'pet.railHide': string;
+  'pet.railShow': string;
+  'pet.railCustomFlavor': string;
+  'pet.railCustomize': string;
   // Tabs in pet settings — split sources so the choice feels exclusive
   'pet.tabBuiltIn': string;
   'pet.tabBuiltInHint': string;

@@ -45,6 +45,7 @@ import { applyAppearanceToDocument } from './state/appearance';
 import { isMacPlatform } from './utils/platform';
 import {
   deleteProject as deleteProjectApi,
+  deleteTemplate,
   listProjects,
   listRecentProjects,
   listTemplates,
@@ -727,7 +728,7 @@ export function App() {
     if (!ok) return;
     setProjects((curr) => curr.filter((p) => p.id !== id));
     if (route.kind === 'project' && route.projectId === id) {
-      navigate({ kind: 'home' });
+      navigate({ kind: 'home', view: 'home' });
     }
   }, [route]);
 
@@ -741,7 +742,7 @@ export function App() {
   }, []);
 
   const handleBack = useCallback(() => {
-    navigate({ kind: 'home' });
+    navigate({ kind: 'home', view: 'home' });
   }, []);
 
   const handleClearPendingPrompt = useCallback(() => {
@@ -788,7 +789,7 @@ export function App() {
       if (cancelled) return;
       setProjects(list);
       if (!list.find((p) => p.id === route.projectId)) {
-        navigate({ kind: 'home' }, { replace: true });
+        navigate({ kind: 'home', view: 'home' }, { replace: true });
       }
     })();
     return () => {

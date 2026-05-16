@@ -935,7 +935,6 @@ export function ChatPane({
             facetSkillId={facetSkillId}
             facetDesignSystemId={facetDesignSystemId}
             facetMetadata={facetMetadata}
-            skills={skills}
             designSystems={designSystems}
             defaultDesignSystemId={defaultDesignSystemId}
             templates={templates}
