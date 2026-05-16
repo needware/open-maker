@@ -18745,6 +18745,32 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
   box-shadow: var(--shadow-xs);
 }
 
+.newproj-media-segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  gap: 2px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.newproj-media-surface {
+  border: none;
+  background: transparent;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.newproj-media-surface:hover:not(.active) { color: var(--text); }
+.newproj-media-surface.active {
+  background: var(--bg-panel);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
 .newproj-aspect-segmented {
   display: flex;
   flex-wrap: wrap;

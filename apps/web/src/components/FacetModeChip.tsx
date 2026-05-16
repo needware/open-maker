@@ -1,7 +1,7 @@
 // FacetModeChip — the composer's persistent affordance for "what am I
 // creating?". Visually a rounded pill with mode icon + mode name +
 // (optional) skill name + caret. Clicking it opens the
-// FacetSetupPopover, which hosts the full eight-tab parameter form
+// FacetSetupPopover, which hosts the full six-tab parameter form
 // (Prototype | Live artifact | Slide deck | From template | Image |
 // Video | Audio | Other) — same controls as the pre-RFC NewProjectPanel.
 //

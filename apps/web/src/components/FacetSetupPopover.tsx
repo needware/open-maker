@@ -1,11 +1,13 @@
 // FacetSetupPopover — the parameter sheet that opens from the
 // composer's FacetModeChip. Hosts the full pre-RFC NewProjectPanel
-// form (now `FacetParametersPanel`) so users get the same eight-tab
-// operation panel they had before — Prototype / Live artifact / Slide
-// deck / From template / Image / Video / Audio / Other — with the
-// same per-tab controls (FidelityPicker, DesignSystemPicker, Speaker
-// notes / Animations toggles, MediaProjectOptions, PromptTemplatePicker,
-// ConnectorsSection).
+// form (now `FacetParametersPanel`) so users get the same six-tab
+// operation panel as the pre-RFC NewProjectPanel — Prototype / Live
+// artifact / Slide deck / From template / Media / Other — with the
+// Media tab housing an inner segmented control that switches between
+// image / video / audio surfaces. Per-tab controls include
+// FidelityPicker, DesignSystemPicker, PlatformPicker, SurfaceOptions,
+// Speaker notes / Animations toggles, MediaProjectOptions,
+// PromptTemplatePicker, and ConnectorsSection.
 //
 // Lifecycle: rendered with `position: fixed` anchored to the chip's
 // bounding rect; outside-click and Escape close it. Selections flow
@@ -28,8 +30,9 @@ import { FacetParametersPanel, type FacetSelection } from './FacetParametersPane
 import { Icon } from './Icon';
 
 // FacetMode is the *contract* mode (seven values) used for the chip's
-// label and icon. The popover internally hosts an eight-tab UI
-// (`CreateTab`) that's a superset — `live-artifact` and `other` are
+// label and icon. The popover internally hosts a six-tab UI
+// (`CreateTab`) whose Media tab consolidates the three media surfaces
+// behind an inner segmented control; `live-artifact` and `other` are
 // pure UI variants that don't add new contract modes.
 export type FacetMode = SkillSummary['mode'];
 

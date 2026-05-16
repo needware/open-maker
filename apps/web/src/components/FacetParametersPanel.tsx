@@ -211,14 +211,33 @@ function hydratePlatformTargets(
   return ['responsive'];
 }
 
-// CreateTab is a UI-only enum: it defines the eight tabs in the
-// FacetSetupPopover. `live-artifact` and `other` are *not* contract
+// CreateTab is a UI-only enum: it defines the six top-level tabs in
+// the FacetSetupPopover. `live-artifact` and `other` are *not* contract
 // FacetMode values — they're surfaced as separate tabs but resolve to
 // `prototype` skills (with `intent: 'live-artifact'` metadata) and
-// "no skill" respectively. Keeping the same name as the original so
-// helper functions (`titleForTab`, `autoName`, `buildMetadata`) stay
-// usable verbatim.
-export type CreateTab = 'prototype' | 'live-artifact' | 'deck' | 'template' | 'image' | 'video' | 'audio' | 'other';
+// "no skill" respectively. `media` is a single tab that consolidates
+// the three image / video / audio surfaces (selectable via an inner
+// segmented control), matching the open-design pre-RFC NewProjectPanel
+// layout.
+export type CreateTab =
+  | 'prototype'
+  | 'live-artifact'
+  | 'deck'
+  | 'template'
+  | 'media'
+  | 'other';
+
+// MediaSurface is the inner switcher inside the consolidated `media`
+// tab. It is also accepted by `pickDefaultSkillIdForTab` (so existing
+// call sites that resolve a skill for a concrete media surface keep
+// working without first translating into a CreateTab).
+export type MediaSurface = 'image' | 'video' | 'audio';
+
+// Tabs and media surfaces both map 1:1 onto skill resolution rules, so
+// `pickDefaultSkillIdForTab` accepts either. The function is exported
+// for tests that want to verify per-surface behavior in isolation; the
+// panel itself always passes either a CreateTab or a MediaSurface.
+type SkillResolutionTab = CreateTab | MediaSurface;
 
 export interface FacetSelection {
   skillId: string | null;
@@ -273,7 +292,7 @@ const FACET_PANEL_OWNED_KEYS = new Set<keyof ProjectMetadata>([
  * fall back to surface-matches when no skill claims the mode at all.
  */
 export function pickDefaultSkillIdForTab(
-  tab: CreateTab,
+  tab: SkillResolutionTab,
   skills: SkillSummary[],
 ): string | null {
   if (tab === 'other') return null;
@@ -316,7 +335,17 @@ export function pickDefaultSkillIdForTab(
   if (tab === 'template') {
     return null;
   }
-  // image / video / audio: media tabs.
+  if (tab === 'media') {
+    // The consolidated Media tab needs a concrete media surface to pick a
+    // default skill against — callers should pass the surface
+    // ('image' / 'video' / 'audio') directly instead. We fall back to
+    // image here so the function still resolves *something* for callers
+    // that genuinely have no surface preference.
+    return pickDefaultSkillIdForTab('image', skills);
+  }
+  // image / video / audio: media surfaces. Same logic as the legacy 8-tab
+  // implementation — preferring mode-matches over surface-only matches so
+  // template skills tagged with a media surface don't accidentally win.
   const modeMatches = skills.filter((s) => s.mode === tab);
   const surfaceFallback = skills.filter(
     (s) => s.mode !== tab && s.surface === tab,
@@ -387,10 +416,18 @@ const TAB_LABEL_KEYS: Record<CreateTab, keyof Dict> = {
   'live-artifact': 'newproj.tabLiveArtifact',
   deck: 'newproj.tabDeck',
   template: 'newproj.tabTemplate',
+  media: 'newproj.tabMedia',
+  other: 'newproj.tabOther',
+};
+
+// Inner segmented control labels shown above the per-surface form when
+// the Media tab is active. Reuses the existing `newproj.surface*` i18n
+// keys (same as the old Image / Video / Audio tab labels) so no new
+// strings need to ship.
+const MEDIA_SURFACE_LABEL_KEYS: Record<MediaSurface, keyof Dict> = {
   image: 'newproj.surfaceImage',
   video: 'newproj.surfaceVideo',
   audio: 'newproj.surfaceAudio',
-  other: 'newproj.tabOther',
 };
 
 export function defaultDesignSystemSelection(
@@ -432,8 +469,19 @@ export function FacetParametersPanel({
   onOpenConnectorsTab,
 }: Props) {
   const t = useT();
-  const [tab, setTab] = useState<CreateTab>(() =>
-    deriveTabFromSelection(currentSkillId, currentMetadata, skills),
+  // Initial tab + media surface derived from what's already saved on the
+  // project. The Media tab keeps its own inner segmented control to flip
+  // between image / video / audio surfaces without losing per-surface
+  // pickers (model, aspect, prompt template, etc.).
+  const initialTabSelection = useMemo(
+    () => deriveTabFromSelection(currentSkillId, currentMetadata, skills),
+    // Intentionally lazy: only compute the initial seed on first render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const [tab, setTab] = useState<CreateTab>(() => initialTabSelection.tab);
+  const [mediaSurface, setMediaSurface] = useState<MediaSurface>(
+    () => initialTabSelection.mediaSurface,
   );
   const tabsRef = useRef<HTMLDivElement | null>(null);
   const [tabScroll, setTabScroll] = useState({ left: false, right: false });
@@ -656,8 +704,12 @@ export function FacetParametersPanel({
   // resolution order lives in `pickDefaultSkillIdForTab` so it stays
   // testable in isolation.
   const skillIdForTab = useMemo(
-    () => pickDefaultSkillIdForTab(tab, skills),
-    [tab, skills],
+    // On the consolidated Media tab the skill must match the selected
+    // *surface* — image / video / audio each resolve to their own
+    // default skill (mode:image, mode:video, mode:audio respectively).
+    () =>
+      pickDefaultSkillIdForTab(tab === 'media' ? mediaSurface : tab, skills),
+    [tab, mediaSurface, skills],
   );
 
   function updateTabScrollState() {
@@ -713,14 +765,18 @@ export function FacetParametersPanel({
   const currentSelection = useMemo<FacetSelection>(() => {
     const { primary: primaryDs, inspirations } =
       buildDesignSystemCreateSelection(showDesignSystemPicker, selectedDsIds);
+    // Prompt template only applies inside the Media tab and only for the
+    // image / video surfaces. Audio has no curated prompt-template
+    // surface today, and the structured tabs never carry one.
     const promptTemplatePick =
-      tab === 'image'
+      tab === 'media' && mediaSurface === 'image'
         ? imagePromptTemplate
-        : tab === 'video'
+        : tab === 'media' && mediaSurface === 'video'
           ? videoPromptTemplate
           : null;
     const metadata = buildMetadata({
       tab,
+      mediaSurface,
       fidelity,
       speakerNotes,
       animations,
@@ -750,6 +806,7 @@ export function FacetParametersPanel({
     showDesignSystemPicker,
     selectedDsIds,
     tab,
+    mediaSurface,
     fidelity,
     speakerNotes,
     animations,
@@ -821,7 +878,7 @@ export function FacetParametersPanel({
       </div>
       <div className="newproj-body">
         <h3 className="newproj-title">
-          <span className="newproj-title-text">{titleForTab(tab, t)}</span>
+          <span className="newproj-title-text">{titleForTab(tab, mediaSurface, t)}</span>
           {tab === 'live-artifact' ? (
             // "Beta" is an internationally adopted brand-style status marker;
             // intentionally not run through t() (consistent with short product
@@ -859,7 +916,31 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'image' ? (
+        {tab === 'media' ? (
+          <div
+            className="newproj-media-segmented"
+            role="tablist"
+            aria-label={t('newproj.tabMedia')}
+          >
+            {(Object.keys(MEDIA_SURFACE_LABEL_KEYS) as MediaSurface[]).map(
+              (surface) => (
+                <button
+                  key={surface}
+                  type="button"
+                  role="tab"
+                  data-testid={`new-project-media-surface-${surface}`}
+                  aria-selected={mediaSurface === surface}
+                  className={`newproj-media-surface ${mediaSurface === surface ? 'active' : ''}`}
+                  onClick={() => setMediaSurface(surface)}
+                >
+                  {t(MEDIA_SURFACE_LABEL_KEYS[surface])}
+                </button>
+              ),
+            )}
+          </div>
+        ) : null}
+
+        {tab === 'media' && mediaSurface === 'image' ? (
           <PromptTemplatePicker
             surface="image"
             templates={promptTemplates}
@@ -868,7 +949,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'video' ? (
+        {tab === 'media' && mediaSurface === 'video' ? (
           <PromptTemplatePicker
             surface="video"
             templates={promptTemplates}
@@ -917,7 +998,7 @@ export function FacetParametersPanel({
           </>
         ) : null}
 
-        {tab === 'image' ? (
+        {tab === 'media' && mediaSurface === 'image' ? (
           <MediaProjectOptions
             surface="image"
             imageModel={imageModel}
@@ -928,7 +1009,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'video' ? (
+        {tab === 'media' && mediaSurface === 'video' ? (
           <MediaProjectOptions
             surface="video"
             videoModel={videoModel}
@@ -941,7 +1022,7 @@ export function FacetParametersPanel({
           />
         ) : null}
 
-        {tab === 'audio' ? (
+        {tab === 'media' && mediaSurface === 'audio' ? (
           <MediaProjectOptions
             surface="audio"
             audioKind={audioKind}
@@ -2582,6 +2663,7 @@ function OptionCards<T extends string | number>({
 
 function buildMetadata(input: {
   tab: CreateTab;
+  mediaSurface: MediaSurface;
   fidelity: 'wireframe' | 'high-fidelity';
   speakerNotes: boolean;
   animations: boolean;
@@ -2602,11 +2684,15 @@ function buildMetadata(input: {
   inspirationIds: string[];
   promptTemplate: PromptTemplatePick | null;
 }): ProjectMetadata {
-  // `kind` and `tab` agree for every CreateTab except `live-artifact`,
-  // which records `kind: 'prototype'` + an `intent: 'live-artifact'`
-  // marker so downstream consumers that only branch on kind keep working.
+  // Resolve project kind: `live-artifact` is a UI variant of `prototype`;
+  // the Media tab's concrete kind comes from the inner surface switcher
+  // (image / video / audio). Everything else maps 1:1 to the tab.
   const kind: ProjectKind =
-    input.tab === 'live-artifact' ? 'prototype' : input.tab;
+    input.tab === 'live-artifact'
+      ? 'prototype'
+      : input.tab === 'media'
+        ? input.mediaSurface
+        : input.tab;
   // Platform + companion-surface metadata. `selectedPlatforms[0]` is the
   // primary target (e.g. used by the chip in ProjectView's header);
   // `concreteTargets` is the full delivery surface set the agent must
@@ -2659,32 +2745,35 @@ function buildMetadata(input: {
       ...inspirations,
     };
   }
-  if (input.tab === 'image') {
-    return {
-      kind,
-      imageModel: input.imageModel,
-      imageAspect: input.imageAspect,
-      ...buildPromptTemplateMetadata(input.promptTemplate),
-      ...inspirations,
-    };
-  }
-  if (input.tab === 'video') {
-    return {
-      kind,
-      videoModel: input.videoModel,
-      videoAspect: input.videoAspect,
-      videoLength: input.videoLength,
-      ...buildPromptTemplateMetadata(input.promptTemplate),
-      ...inspirations,
-    };
-  }
-  if (input.tab === 'audio') {
+  if (input.tab === 'media') {
+    if (input.mediaSurface === 'image') {
+      return {
+        kind,
+        imageModel: input.imageModel,
+        imageAspect: input.imageAspect,
+        ...buildPromptTemplateMetadata(input.promptTemplate),
+        ...inspirations,
+      };
+    }
+    if (input.mediaSurface === 'video') {
+      return {
+        kind,
+        videoModel: input.videoModel,
+        videoAspect: input.videoAspect,
+        videoLength: input.videoLength,
+        ...buildPromptTemplateMetadata(input.promptTemplate),
+        ...inspirations,
+      };
+    }
+    // mediaSurface === 'audio'
     return {
       kind,
       audioKind: input.audioKind,
       audioModel: input.audioModel,
       audioDuration: input.audioDuration,
-      voice: input.voice.trim() || undefined,
+      ...(input.audioKind === 'speech' && input.voice.trim()
+        ? { voice: input.voice.trim() }
+        : {}),
       ...inspirations,
     };
   }
@@ -2721,7 +2810,11 @@ function buildPromptTemplateMetadata(
   };
 }
 
-function titleForTab(tab: CreateTab, t: TranslateFn): string {
+function titleForTab(
+  tab: CreateTab,
+  mediaSurface: MediaSurface,
+  t: TranslateFn,
+): string {
   switch (tab) {
     case 'prototype':
       return t('newproj.titlePrototype');
@@ -2731,12 +2824,18 @@ function titleForTab(tab: CreateTab, t: TranslateFn): string {
       return t('newproj.titleDeck');
     case 'template':
       return t('newproj.titleTemplate');
-    case 'image':
-      return t('newproj.titleImage');
-    case 'video':
-      return t('newproj.titleVideo');
-    case 'audio':
-      return t('newproj.titleAudio');
+    case 'media': {
+      // Title tracks the active surface so the heading still reads
+      // "New image" / "New video" / "New audio" — the shared "Media"
+      // label only appears on the tab strip itself.
+      const key: keyof Dict =
+        mediaSurface === 'image'
+          ? 'newproj.titleImage'
+          : mediaSurface === 'video'
+            ? 'newproj.titleVideo'
+            : 'newproj.titleAudio';
+      return t(key);
+    }
     case 'other':
       return t('newproj.titleOther');
   }
@@ -2748,42 +2847,50 @@ function autoName(tab: CreateTab, t: TranslateFn): string {
 }
 
 /**
- * Pick which tab the popover should land on, given what's already
- * persisted on the project. The tab enum has eight values; only seven
- * are 1:1 with skill `mode` (the `live-artifact` tab is a UI-only
- * variant of `prototype` flagged by `metadata.intent === 'live-artifact'`,
- * and `other` means "no skill"). We respect that mapping when
- * hydrating, so reopening a project drops the user back into the same
- * tab they last picked.
+ * Pick which tab + media surface the popover should land on, given
+ * what's already persisted on the project. The tab enum has six values;
+ * four are 1:1 with skill `mode`, `live-artifact` is a UI variant of
+ * `prototype` flagged by `metadata.intent === 'live-artifact'`, and
+ * `media` consolidates the three image / video / audio surfaces (the
+ * inner surface is returned alongside the tab so the panel can hydrate
+ * its segmented control). `other` means "no skill". We respect that
+ * mapping when hydrating, so reopening a project drops the user back
+ * into the same tab + surface they last picked.
  */
 function deriveTabFromSelection(
   skillId: string | null,
   metadata: ProjectMetadata | undefined,
   skills: SkillSummary[],
-): CreateTab {
-  if (!skillId) return 'other';
-  if (metadata?.intent === 'live-artifact') return 'live-artifact';
+): { tab: CreateTab; mediaSurface: MediaSurface } {
+  // `image` is the default surface used whenever the panel lands on a
+  // non-media tab — it never gets surfaced to the user until they switch
+  // to the Media tab, so the value just needs to be a stable seed.
+  const defaultSurface: MediaSurface = 'image';
+  if (!skillId) return { tab: 'other', mediaSurface: defaultSurface };
+  if (metadata?.intent === 'live-artifact') {
+    return { tab: 'live-artifact', mediaSurface: defaultSurface };
+  }
   const skill = skills.find((s) => s.id === skillId);
-  if (!skill) return 'prototype';
+  if (!skill) return { tab: 'prototype', mediaSurface: defaultSurface };
   switch (skill.mode) {
     case 'prototype':
-      return 'prototype';
+      return { tab: 'prototype', mediaSurface: defaultSurface };
     case 'deck':
-      return 'deck';
+      return { tab: 'deck', mediaSurface: defaultSurface };
     case 'template':
-      return 'template';
+      return { tab: 'template', mediaSurface: defaultSurface };
     case 'image':
-      return 'image';
+      return { tab: 'media', mediaSurface: 'image' };
     case 'video':
-      return 'video';
+      return { tab: 'media', mediaSurface: 'video' };
     case 'audio':
-      return 'audio';
+      return { tab: 'media', mediaSurface: 'audio' };
     case 'design-system':
       // The new contract has 'design-system' as a mode but the legacy
       // form's tab set doesn't — fold it into "other" so the user still
       // sees the freeform surface and can pick something else.
-      return 'other';
+      return { tab: 'other', mediaSurface: defaultSurface };
     default:
-      return 'prototype';
+      return { tab: 'prototype', mediaSurface: defaultSurface };
   }
 }
