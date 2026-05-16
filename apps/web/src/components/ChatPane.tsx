@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
 import { useT } from '../i18n';
 import type { Dict } from '../i18n/types';
+import { copyToClipboard } from '../lib/copy-to-clipboard';
 import { projectRawUrl } from '../providers/registry';
 import type { TodoItem } from '../runtime/todos';
 import type {
@@ -8,6 +9,7 @@ import type {
   ChatAttachment,
   ChatCommentAttachment,
   ChatMessage,
+  ChatMessageFeedbackChange,
   Conversation,
   DesignSystemSummary,
   MediaProviderCredentials,
@@ -18,7 +20,9 @@ import type {
   PromptTemplateSummary,
   SkillSummary,
 } from '../types';
-import type { ConnectorDetail } from '@open-design/contracts';
+import type { AppliedPluginSnapshot, ConnectorDetail } from '@open-design/contracts';
+import { latestTodoWriteInputFromMessages } from '../runtime/todos';
+import { TodoCard } from './ToolCard';
 import { dayKey, dayLabel, exactDateTime, messageTime, relativeTimeLong } from '../utils/chatTime';
 import { commentsToAttachments, simplePositionLabel } from '../comments';
 import { AssistantMessage } from './AssistantMessage';
@@ -29,6 +33,7 @@ import {
 } from './ChatComposer';
 import type { FacetSelection } from './FacetParametersPanel';
 import type { FacetMode } from './FacetSetupPopover';
+import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
 import { Icon } from './Icon';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
@@ -216,6 +221,7 @@ interface Props {
   error: string | null;
   projectId: string | null;
   projectFiles: ProjectFile[];
+  hasActiveDesignSystem?: boolean;
   sendDisabled?: boolean;
   // Names that exist in the project folder. Tool cards and chips use this
   // set to decide whether a path can be opened as a tab.
@@ -240,6 +246,10 @@ interface Props {
   // FileWorkspace's openRequest. Tool cards, attachment chips, and
   // produced-file chips all call this.
   onRequestOpenFile?: (name: string) => void;
+  onRequestPluginFolderAgentAction?: (
+    relativePath: string,
+    action: PluginFolderAgentAction,
+  ) => Promise<void> | void;
   initialDraft?: string;
   // Question-form submissions become a normal user message; the parent
   // routes that text through onSend (no attachments).
@@ -271,7 +281,15 @@ interface Props {
   onOpenPetSettings?: () => void;
   projectMetadata?: ProjectMetadata;
   onProjectMetadataChange?: (metadata: ProjectMetadata) => void;
+  currentSkillId?: string | null;
+  onProjectSkillChange?: (skillId: string | null) => void;
   researchAvailable?: boolean;
+  // Immutable snapshot of the plugin pinned to this project. When set
+  // we suppress the in-composer plugin rail (the user already picked a
+  // plugin on Home) and render the active plugin as a context chip on
+  // each user message — that satisfies §8 "show context inside the run
+  // message" without forcing a separate side widget.
+  activePluginSnapshot?: AppliedPluginSnapshot | null;
   onCollapse?: () => void;
   // Facet creation chip wiring. Passed through to ChatComposer.
   facetMode?: FacetMode;
@@ -302,6 +320,7 @@ export function ChatPane({
   error,
   projectId,
   projectFiles,
+  hasActiveDesignSystem = false,
   projectFileNames,
   onEnsureProject,
   previewComments = [],
@@ -312,6 +331,7 @@ export function ChatPane({
   onSend,
   onStop,
   onRequestOpenFile,
+  onRequestPluginFolderAgentAction,
   initialDraft,
   onSubmitForm,
   onContinueRemainingTasks,
@@ -331,8 +351,11 @@ export function ChatPane({
   onOpenPetSettings,
   projectMetadata,
   onProjectMetadataChange,
-  skills = [],
+  currentSkillId = null,
+  onProjectSkillChange,
   researchAvailable,
+  activePluginSnapshot,
+  skills = [],
   onCollapse,
   facetMode,
   facetSkillId = null,
@@ -377,10 +400,19 @@ export function ChatPane({
   const [tab, setTab] = useState<Tab>('chat');
   const [showConvList, setShowConvList] = useState(false);
   const [scrolledFromBottom, setScrolledFromBottom] = useState(false);
+  // The user can dismiss the pinned task list once everything is complete.
+  // We key the dismissal on the snapshot (serialized TodoWrite input) so
+  // the next time the agent emits a different snapshot the card returns,
+  // but the same snapshot stays hidden across renders / streaming ticks.
+  const [dismissedPinnedTodoKey, setDismissedPinnedTodoKey] = useState<string | null>(null);
   const lastAssistantId = [...messages].reverse().find((m) => m.role === 'assistant')?.id;
   const hasActiveRunMessage = messages.some(
     (m) => m.role === 'assistant' && isActiveRunStatus(m.runStatus),
   );
+  // Only the first user message gets the active-plugin chip — the
+  // plugin is project-scoped so re-stamping it on every reply would be
+  // noise. Subsequent messages still run under the same snapshot.
+  const firstUserMessageId = messages.find((m) => m.role === 'user')?.id;
   // Map each assistant message id to the user message that follows it
   // (if any) so QuestionFormView can render its locked "answered" state
   // with the user's picks.
@@ -403,6 +435,23 @@ export function ChatPane({
     savedChatScrollRef.current = null;
     scrolledToFormRef.current = new Set();
   }, [activeConversationId]);
+
+  // ChatComposer's internal `seededRef` latches after the first
+  // non-empty `initialDraft`, so a parent setting `initialDraft` back
+  // to `undefined` will not flow into the composer's draft state. When
+  // the parent does that transition (because the seed is now stale —
+  // e.g. ProjectView discovered the conversation already has a sent
+  // user message after a reload), reach into the composer and clear
+  // the textarea so the user does not see the prompt they already
+  // submitted.
+  const lastSeenInitialDraftRef = useRef<string | undefined>(initialDraft);
+  useEffect(() => {
+    const previous = lastSeenInitialDraftRef.current;
+    lastSeenInitialDraftRef.current = initialDraft;
+    if (previous && initialDraft === undefined) {
+      composerRef.current?.setDraft('');
+    }
+  }, [initialDraft]);
 
   useEffect(() => {
     const el = logRef.current;
@@ -547,6 +596,65 @@ export function ChatPane({
       // right before unmount can leave it stale.
       snapshot(el);
       el.removeEventListener('scroll', onScroll);
+    };
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== 'chat') return;
+    const el = logRef.current;
+    if (!el) return;
+
+    let followFrame: number | null = null;
+    const followLatestIfPinned = () => {
+      if (!pinnedToBottomRef.current || followFrame !== null) return;
+      followFrame = requestAnimationFrame(() => {
+        followFrame = null;
+        const target = logRef.current;
+        if (!target || !pinnedToBottomRef.current) return;
+        target.scrollTop = target.scrollHeight;
+        setScrolledFromBottom(false);
+      });
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(followLatestIfPinned)
+        : null;
+    const observedChildren = new Set<Element>();
+    const syncObservedChildren = () => {
+      if (!resizeObserver) return;
+      const currentChildren = new Set(Array.from(el.children));
+      for (const child of currentChildren) {
+        if (observedChildren.has(child)) continue;
+        resizeObserver.observe(child);
+        observedChildren.add(child);
+      }
+      for (const child of observedChildren) {
+        if (currentChildren.has(child)) continue;
+        resizeObserver.unobserve(child);
+        observedChildren.delete(child);
+      }
+    };
+
+    syncObservedChildren();
+
+    const mutationObserver =
+      typeof MutationObserver !== 'undefined'
+        ? new MutationObserver(() => {
+            syncObservedChildren();
+            followLatestIfPinned();
+          })
+        : null;
+    mutationObserver?.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      if (followFrame !== null) cancelAnimationFrame(followFrame);
+      mutationObserver?.disconnect();
+      resizeObserver?.disconnect();
     };
   }, [tab]);
 
@@ -720,9 +828,11 @@ export function ChatPane({
               ) : null}
               {messages.map((m, i) => {
                 const showDaySeparator = shouldShowDaySeparator(messages[i - 1], m);
-                const messageStreaming =
-                  m.role === 'assistant' &&
-                  ((streaming && m.id === lastAssistantId) || isActiveRunStatus(m.runStatus));
+                const messageStreaming = isAssistantMessageStreaming(
+                  m,
+                  streaming,
+                  lastAssistantId,
+                );
                 return (
                   <Fragment key={m.id}>
                     {showDaySeparator ? <DaySeparator ts={messageTime(m)} /> : null}
@@ -733,16 +843,24 @@ export function ChatPane({
                         projectFileNames={projectFileNames}
                         onRequestOpenFile={onRequestOpenFile}
                         t={t}
+                        activePluginSnapshot={
+                          m.id === firstUserMessageId
+                            ? activePluginSnapshot ?? null
+                            : null
+                        }
                       />
                     ) : (
                       <AssistantMessage
                         message={m}
                         streaming={messageStreaming}
                         projectId={projectId}
+                        projectFiles={projectFiles}
                         projectFileNames={projectFileNames}
                         onRequestOpenFile={onRequestOpenFile}
+                        onRequestPluginFolderAgentAction={onRequestPluginFolderAgentAction}
                         isLast={m.id === lastAssistantId}
                         nextUserContent={nextUserContentByAssistantId.get(m.id)}
+                        suppressDirectionForms={hasActiveDesignSystem}
                         onSubmitForm={(text) => {
                           pinnedToBottomRef.current = true;
                           scrolledToFormRef.current = new Set();
@@ -765,18 +883,28 @@ export function ChatPane({
               })}
               {error ? <div className="msg error">{error}</div> : null}
             </div>
-            {scrolledFromBottom ? (
-              <button
-                type="button"
-                className="chat-jump-btn"
-                onClick={jumpToBottom}
-                title={t('chat.scrollToLatest')}
-              >
-                <Icon name="arrow-up" size={12} style={{ transform: 'rotate(180deg)' }} />
-                <span>{t('chat.jumpToLatest')}</span>
-              </button>
-            ) : null}
+            {/* Always mounted so the CSS transition can play in both
+                directions; the `chat-jump-btn-active` class flips the
+                slide + opacity, and `aria-hidden` + `tabIndex={-1}`
+                keep it out of the a11y tree when it's not visible. */}
+            <button
+              type="button"
+              className={`chat-jump-btn${scrolledFromBottom ? ' chat-jump-btn-active' : ''}`}
+              onClick={jumpToBottom}
+              title={t('chat.scrollToLatest')}
+              aria-hidden={!scrolledFromBottom}
+              tabIndex={scrolledFromBottom ? 0 : -1}
+            >
+              <Icon name="arrow-up" size={12} style={{ transform: 'rotate(180deg)' }} />
+              <span>{t('chat.jumpToLatest')}</span>
+            </button>
           </div>
+          <PinnedTodoSlot
+            messages={messages}
+            streaming={streaming}
+            dismissedKey={dismissedPinnedTodoKey}
+            onDismiss={setDismissedPinnedTodoKey}
+          />
           <ChatComposer
             ref={composerRef}
             projectId={projectId}
@@ -820,6 +948,55 @@ export function ChatPane({
           />
         </>
       ) : null}
+    </div>
+  );
+}
+
+// Pinned task list above the chat composer. The latest TodoWrite snapshot
+// across the entire conversation is the canonical state; AssistantMessage
+// no longer renders these inline so there is exactly one TodoCard on
+// screen. When every task is complete the user can dismiss the card; the
+// dismissal sticks to the current snapshot only, so a fresh TodoWrite
+// from the agent re-shows it.
+function PinnedTodoSlot({
+  messages,
+  streaming,
+  dismissedKey,
+  onDismiss,
+}: {
+  messages: ChatMessage[];
+  streaming: boolean;
+  dismissedKey: string | null;
+  onDismiss: (key: string | null) => void;
+}) {
+  // `exiting` lets the dismiss click play a slide-down transition before
+  // the slot tears down. Without it React would unmount immediately and
+  // the card would pop out without animation.
+  const [exiting, setExiting] = useState(false);
+  const input = latestTodoWriteInputFromMessages(messages);
+  if (input == null) return null;
+  let snapshotKey: string;
+  try {
+    snapshotKey = JSON.stringify(input);
+  } catch {
+    snapshotKey = String(input);
+  }
+  if (snapshotKey === dismissedKey) return null;
+  return (
+    <div className={`chat-pinned-todo${exiting ? ' chat-pinned-todo-exit' : ''}`}>
+      <TodoCard
+        input={input}
+        runStreaming={streaming}
+        runSucceeded={!streaming}
+        onDismiss={() => {
+          if (exiting) return;
+          setExiting(true);
+          // Match the slide-out duration in CSS (220ms) — once the
+          // transition completes the snapshot key is recorded as
+          // dismissed and the slot is unmounted by the early return.
+          window.setTimeout(() => onDismiss(snapshotKey), 220);
+        }}
+      />
     </div>
   );
 }
@@ -941,6 +1118,24 @@ function isActiveRunStatus(status: ChatMessage['runStatus']): boolean {
   return status === 'queued' || status === 'running';
 }
 
+function isTerminalRunStatus(status: ChatMessage['runStatus']): boolean {
+  return status === 'succeeded' || status === 'failed' || status === 'canceled';
+}
+
+export function isAssistantMessageStreaming(
+  message: ChatMessage,
+  paneStreaming: boolean,
+  lastAssistantId: string | null | undefined,
+): boolean {
+  if (message.role !== 'assistant') return false;
+  if (isActiveRunStatus(message.runStatus)) return true;
+  if (message.id !== lastAssistantId) return false;
+  if (!paneStreaming) return false;
+  if (message.endedAt !== undefined) return false;
+  if (isTerminalRunStatus(message.runStatus)) return false;
+  return true;
+}
+
 function ConversationRow({
   conversation,
   active,
@@ -1001,7 +1196,7 @@ function ConversationRow({
           {displayTitle}
         </button>
       )}
-      <span className="chat-conv-item-meta">{relTime(conversation.updatedAt, t)}</span>
+      <span className="chat-conv-item-meta">{conversationMetaLabel(conversation, t)}</span>
       <button
         type="button"
         className="chat-conv-item-del"
@@ -1028,21 +1223,47 @@ function UserMessage({
   projectFileNames,
   onRequestOpenFile,
   t,
+  activePluginSnapshot,
 }: {
   message: ChatMessage;
   projectId: string | null;
   projectFileNames?: Set<string>;
   onRequestOpenFile?: (name: string) => void;
   t: TranslateFn;
+  activePluginSnapshot?: AppliedPluginSnapshot | null;
 }) {
   const attachments = message.attachments ?? [];
   const commentAttachments = message.commentAttachments ?? [];
+  const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    if (!message.content) return;
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    const ok = await copyToClipboard(message.content);
+    if (!ok) return;
+    setCopied(true);
+    copyTimerRef.current = setTimeout(() => {
+      setCopied(false);
+      copyTimerRef.current = undefined;
+    }, 2000);
+  }
+
   return (
     <div className="msg user">
       <div className="role">
         <span>{t('chat.you')}</span>
         <MessageTimestamp message={message} t={t} />
       </div>
+      {activePluginSnapshot ? (
+        <ActivePluginChip snapshot={activePluginSnapshot} t={t} />
+      ) : null}
       {attachments.length > 0 ? (
         <div className="user-attachments">
           {attachments.map((a) => {
@@ -1085,7 +1306,50 @@ function UserMessage({
           ))}
         </div>
       ) : null}
-      {message.content ? <div className="user-text user-bubble">{message.content}</div> : null}
+      {message.content ? (
+        <div className="user-text-wrap">
+          <div className="user-text user-bubble">{message.content}</div>
+          <button
+            type="button"
+            className="ghost user-copy-btn"
+            onClick={handleCopy}
+            aria-label={copied ? t('chat.copyDone') : t('chat.copyPrompt')}
+            title={copied ? t('chat.copyDone') : t('chat.copyPrompt')}
+          >
+            <Icon name={copied ? 'check' : 'copy'} size={12} />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Context chip rendered above a user message when the project pinned a
+// plugin at create time (PluginLoopHome on Home). Replaces the noisy
+// in-composer plugin rail so the user is not re-prompted to pick
+// something they already chose; instead the active plugin lives inside
+// the run message it kicked off.
+function ActivePluginChip({
+  snapshot,
+  t: _t,
+}: {
+  snapshot: AppliedPluginSnapshot;
+  t: TranslateFn;
+}) {
+  const title = snapshot.pluginTitle ?? snapshot.pluginId;
+  const version = snapshot.pluginVersion;
+  const taskKind = snapshot.taskKind;
+  return (
+    <div className="msg-plugin-chip" data-testid="msg-plugin-chip">
+      <span className="msg-plugin-chip__dot" aria-hidden />
+      <span className="msg-plugin-chip__label">
+        <span className="msg-plugin-chip__kind">Plugin</span>
+        <span className="msg-plugin-chip__title">{title}</span>
+        <span className="msg-plugin-chip__version">@{version}</span>
+      </span>
+      {taskKind ? (
+        <span className="msg-plugin-chip__task">{taskKind}</span>
+      ) : null}
     </div>
   );
 }
@@ -1127,4 +1391,30 @@ function relTime(ts: number, t: TranslateFn): string {
   if (diff < day) return t('common.hoursShort', { n: Math.floor(diff / hr) });
   if (diff < 7 * day) return t('common.daysShort', { n: Math.floor(diff / day) });
   return new Date(ts).toLocaleDateString();
+}
+
+export function conversationMetaLabel(
+  conversation: Conversation,
+  t: TranslateFn,
+): string {
+  const latestRun = conversation.latestRun;
+  if (
+    latestRun &&
+    (latestRun.status === 'succeeded' ||
+      latestRun.status === 'failed' ||
+      latestRun.status === 'canceled') &&
+    typeof latestRun.durationMs === 'number' &&
+    Number.isFinite(latestRun.durationMs)
+  ) {
+    return formatDurationShort(latestRun.durationMs);
+  }
+  return relTime(conversation.updatedAt, t);
+}
+
+function formatDurationShort(ms: number): string {
+  const s = Math.max(0, ms) / 1000;
+  if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)}s`;
+  const m = Math.floor(s / 60);
+  const rem = Math.floor(s - m * 60);
+  return `${m}m ${rem.toString().padStart(2, '0')}s`;
 }

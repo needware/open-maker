@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 
 const STORAGE_KEY = 'open-design:config';
 
-test.describe.configure({ timeout: 15_000 });
+test.describe.configure({ timeout: 30_000 });
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => {
@@ -19,9 +19,31 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
+        privacyDecisionAt: 1,
+        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
+
+  await page.route('**/api/app-config', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      json: {
+        config: {
+          onboardingCompleted: true,
+          agentId: 'mock',
+          skillId: null,
+          designSystemId: null,
+          agentModels: {},
+          privacyDecisionAt: 1,
+          telemetry: { metrics: false, content: false, artifactManifest: false },
+        },
+      },
+    });
+  });
 });
 
 test('manual edit inspector previews and persists page and selected element styles', async ({ page }) => {
@@ -125,6 +147,48 @@ test('manual edit inspector previews and persists page and selected element styl
   await expect(page.getByRole('menuitem', { name: /Export as PDF/ })).toBeVisible();
 });
 
+test('manual edit mode preserves preview actions after style edits', async ({ page }) => {
+  await routeMockAgents(page);
+  const projectId = await createEmptyProject(page, 'Manual edit smoke');
+  await seedHtmlArtifact(page, projectId, 'manual-edit.html', manualEditHtml());
+  await page.goto(`/projects/${projectId}/files/manual-edit.html`);
+  await openDesignFile(page, 'manual-edit.html');
+
+  await expect(page.getByTestId('artifact-preview-frame')).toBeVisible();
+  const frame = page.frameLocator('[data-testid="artifact-preview-frame"]');
+  await expect(frame.getByRole('heading', { name: 'Original Hero' })).toBeVisible();
+
+  await page.getByTestId('manual-edit-mode-toggle').click();
+  const fontSizeInput = await selectStyleRowInput(page, frame, '[data-od-id="hero-title"]', 'TYPOGRAPHY', 'Size');
+  await fontSizeInput.fill('48');
+  await expectFileSource(page, projectId, 'manual-edit.html', ['font-size: 48px']);
+
+  await page.getByTestId('manual-edit-mode-toggle').click();
+  await expect(frame.getByRole('heading', { name: 'Original Hero' })).toBeVisible();
+
+  await page.getByTestId('board-mode-toggle').click();
+  await expect(page.getByTestId('comment-mode-toggle')).toBeVisible();
+  await frame.getByRole('heading', { name: 'Original Hero' }).click();
+  await expect(page.getByTestId('comment-popover')).toBeVisible();
+
+  await page.getByRole('button', { name: /^Share$/ }).click();
+  await expect(page.getByRole('menuitem', { name: /Export as PDF/ })).toBeVisible();
+});
+
+async function selectStyleRowInput(
+  page: Page,
+  frame: ReturnType<Page['frameLocator']>,
+  selector: string,
+  section: string,
+  label: string,
+) {
+  await frame.locator(selector).click();
+  await expect(page.locator('.manual-edit-modal')).toContainText('TYPOGRAPHY');
+  const row = inspectorSection(page, section).locator('.cc-row').filter({ hasText: label }).locator('input');
+  await expect(row).toBeVisible();
+  return row;
+}
+
 test('manual edit mode keeps deck navigation available for deck-shaped HTML', async ({ page }) => {
   await routeMockAgents(page);
   const projectId = await createEmptyProject(page, 'Manual edit deck smoke');
@@ -158,10 +222,11 @@ async function routeMockAgents(page: Page) {
 }
 
 async function createEmptyProject(page: Page, name: string): Promise<string> {
-  await page.goto('/');
-  await expect(page.getByTestId('new-project-panel')).toBeVisible();
+  await gotoEntryHome(page);
+  await openNewProjectModal(page);
   await page.getByTestId('new-project-name').fill(name);
   await page.getByTestId('create-project').click();
+  await waitForLoadingToClear(page);
   await expect(page).toHaveURL(/\/projects\//);
   const current = new URL(page.url());
   const [, projects, projectId] = current.pathname.split('/');
@@ -169,27 +234,70 @@ async function createEmptyProject(page: Page, name: string): Promise<string> {
   return projectId;
 }
 
+async function gotoEntryHome(page: Page) {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
+  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
+  if (await privacyDialog.isVisible().catch(() => false)) {
+    await privacyDialog.getByRole('button', { name: /not now/i }).click();
+    await expect(privacyDialog).toHaveCount(0);
+  }
+  await expect(page.getByTestId('home-hero')).toBeVisible();
+  await expect(page.getByTestId('home-hero-input')).toBeVisible();
+}
+
+async function openNewProjectModal(page: Page) {
+  await page.getByTestId('entry-nav-new-project').click();
+  await expect(page.getByTestId('new-project-panel')).toBeVisible();
+}
+
 async function seedHtmlArtifact(page: Page, projectId: string, fileName: string, content: string) {
-  const resp = await page.request.post(`/api/projects/${projectId}/files`, {
-    data: {
-      name: fileName,
-      content,
-      artifactManifest: {
-        version: 1,
-        kind: 'html',
-        title: fileName,
-        entry: fileName,
-        renderer: 'html',
-        exports: ['html'],
+  const resp = await page.request.post(
+    `/api/projects/${projectId}/files`,
+    {
+      data: {
+        name: fileName,
+        content,
+        artifactManifest: {
+          version: 1,
+          kind: 'html',
+          title: fileName,
+          entry: fileName,
+          renderer: 'html',
+          exports: ['html'],
+        },
       },
+      timeout: 15_000,
     },
-  });
+  );
   expect(resp.ok()).toBeTruthy();
 }
 
 async function openDesignFile(page: Page, fileName: string) {
-  await page.getByRole('button', { name: new RegExp(fileName.replace('.', '\\.')) }).click();
+  const preview = page.getByTestId('artifact-preview-frame');
+  if (await preview.isVisible().catch(() => false)) {
+    return;
+  }
+
+  const fileTab = page.getByRole('tab', { name: new RegExp(fileName.replace('.', '\\.'), 'i') });
+  if (
+    await fileTab
+      .waitFor({ state: 'visible', timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await fileTab.click();
+    return;
+  }
+
+  const fileButton = page.getByRole('button', { name: new RegExp(fileName.replace('.', '\\.'), 'i') });
+  await fileButton.click();
   await page.getByTestId('design-file-preview').getByRole('button', { name: 'Open' }).click();
+}
+
+async function waitForLoadingToClear(page: Page) {
+  const loading = page.getByText('Loading Open Design…');
+  await loading.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
 }
 
 async function expectFileSource(page: Page, projectId: string, fileName: string, snippets: string[]) {

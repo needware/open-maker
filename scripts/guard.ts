@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
+import { checkDesignSystemFlagParity } from "./check-design-system-flag-parity.ts";
 import {
   checkDesignSystemA1RequiredTokens,
   checkDesignSystemA2DefaultsParity,
@@ -50,8 +51,11 @@ const residualSkippedDirectories = new Set([
 const residualAllowedExactPaths = new Set([
   // esbuild config entrypoints are executed directly by Node before package
   // dist output exists.
+  "packages/agui-adapter/esbuild.config.mjs",
   "packages/contracts/esbuild.config.mjs",
   "packages/platform/esbuild.config.mjs",
+  "packages/plugin-runtime/esbuild.config.mjs",
+  "packages/registry-protocol/esbuild.config.mjs",
   "packages/sidecar/esbuild.config.mjs",
   "packages/sidecar-proto/esbuild.config.mjs",
   // Maintainer utility scripts ported from the media branch. They are
@@ -108,6 +112,12 @@ const residualAllowedPathPatterns: RegExp[] = [
   // JavaScript under these design-template directories must still be converted
   // to TypeScript or explicitly listed in `residualAllowedExactPaths`.
   /^design-templates\/html-ppt-zhangzara-[^/]+\/assets\/deck-stage\.js$/,
+  // Bundled example/skill plugins copy the upstream skill's `assets/`
+  // and `references/` directories verbatim so the daemon's preview
+  // surface can render the baked HTML without staging detours. Those
+  // assets are vendored runtime, never project-owned code, and must
+  // not be retypecasted to TypeScript.
+  /^plugins\/_official\/examples\/[^/]+\/(assets|references)\/.+$/,
 ];
 
 function isResidualAllowedPath(repositoryPath: string): boolean {
@@ -700,6 +710,7 @@ const checks: GuardCheck[] = [
   { name: "design system B-slot required tokens", run: checkDesignSystemBSlotRequiredTokens },
   { name: "design system unknown token allowlist", run: checkDesignSystemUnknownTokens },
   { name: "design system A2 defaults parity", run: checkDesignSystemA2DefaultsParity },
+  { name: "design system flag parity", run: checkDesignSystemFlagParity },
 ];
 
 const results: boolean[] = [];
