@@ -74,7 +74,7 @@ export function IntegrationsView({
           </h1>
           <p className="integrations-view__lede">
             Connect external systems, bring MCP tools into your agent loop, and
-            use Open Design from other IDEs, scripts, and automations.
+            use Open Maker from other IDEs, scripts, and automations.
           </p>
         </div>
         <div className="integrations-view__badge" aria-hidden="true">

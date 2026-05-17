@@ -105,7 +105,7 @@ export async function createProject(input: {
 }): Promise<{ project: Project; conversationId: string; appliedPluginSnapshotId?: string } | null> {
   try {
     // `randomUUID` falls back to `crypto.getRandomValues` / `Math.random`
-    // when `crypto.randomUUID` is unavailable. Open Design served over
+    // when `crypto.randomUUID` is unavailable. Open Maker served over
     // plain HTTP on a LAN IP (Docker / unRAID self-hosting) is a
     // non-secure context, where `crypto.randomUUID` is undefined and
     // calling it directly throws — the surrounding try/catch then turns
@@ -121,6 +121,35 @@ export async function createProject(input: {
       project: Project;
       conversationId: string;
       appliedPluginSnapshotId?: string;
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pre-RFC ZIP-import flow (Claude Design canvas archives). Kept around
+ * because the daemon still serves /api/import/claude-design and the
+ * EntryShell hero offers an "Import .zip" affordance. The daemon
+ * stamps `importedFrom: 'claude-design'` on the project metadata
+ * (extracted into a scratch baseDir per project-as-unit) so the
+ * resulting project still satisfies the RFC invariant.
+ */
+export async function importClaudeDesignZip(
+  file: File,
+): Promise<{ project: Project; conversationId: string; entryFile: string } | null> {
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const resp = await fetch('/api/import/claude-design', {
+      method: 'POST',
+      body: form,
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as {
+      project: Project;
+      conversationId: string;
+      entryFile: string;
     };
   } catch {
     return null;

@@ -3,7 +3,7 @@ export type PluginFolderAgentAction = 'install' | 'publish' | 'contribute';
 const ACTION_TITLES: Record<PluginFolderAgentAction, string> = {
   install: 'Install this generated plugin into My plugins.',
   publish: 'Publish this generated plugin to a public repository.',
-  contribute: 'Prepare an Open Design registry PR for this generated plugin.',
+  contribute: 'Prepare an Open Maker registry PR for this generated plugin.',
 };
 
 const ACTION_NOTES: Record<PluginFolderAgentAction, string> = {
@@ -12,7 +12,7 @@ const ACTION_NOTES: Record<PluginFolderAgentAction, string> = {
   publish:
     'Use the supported `od plugin publish` or repository-publish flow after confirming the manifest.',
   contribute:
-    'Use the supported `od plugin publish` Open Design registry flow after confirming the manifest.',
+    'Use the supported `od plugin publish` Open Maker registry flow after confirming the manifest.',
 };
 
 export function buildPluginFolderAgentActionPrompt(

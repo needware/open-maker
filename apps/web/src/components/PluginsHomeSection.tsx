@@ -61,8 +61,8 @@ export function PluginsHomeSection({
   onBrowseRegistry,
   preferDefaultFacet = true,
   title = 'Official starters',
-  subtitle = 'Ready-to-use Open Design workflows bundled with this runtime. Pick one to load a starter prompt, or browse the registry for more.',
-  emptyMessage = 'Catalog is empty. Bundled plugins ship with Open Design and should appear here automatically — try restarting the daemon if this persists.',
+  subtitle = 'Ready-to-use Open Maker workflows bundled with this runtime. Pick one to load a starter prompt, or browse the registry for more.',
+  emptyMessage = 'Catalog is empty. Bundled plugins ship with Open Maker and should appear here automatically — try restarting the daemon if this persists.',
 }: Props) {
   const {
     visiblePlugins,

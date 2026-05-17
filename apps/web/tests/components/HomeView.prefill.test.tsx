@@ -29,7 +29,7 @@ const AUTHORING_PLUGIN = {
     od: {
       kind: 'scenario',
       taskKind: 'new-generation',
-      useCase: { query: 'Create an Open Design plugin for {{pluginGoal}}.' },
+      useCase: { query: 'Create an Open Maker plugin for {{pluginGoal}}.' },
       inputs: [
         {
           name: 'pluginGoal',
@@ -142,9 +142,9 @@ const WEB_PROTOTYPE_PLUGIN = {
 };
 
 const AUTHORING_DEFAULT_SCENARIO_INPUTS = {
-  artifactKind: 'Open Design plugin',
-  audience: 'Open Design plugin authors',
-  topic: 'packaging a reusable workflow as an Open Design plugin',
+  artifactKind: 'Open Maker plugin',
+  audience: 'Open Maker plugin authors',
+  topic: 'packaging a reusable workflow as an Open Maker plugin',
 };
 
 const AUTHORING_APPLY_RESULT = {
@@ -397,9 +397,9 @@ describe('HomeView prompt handoff', () => {
     ));
     expect(JSON.parse(String((applyCall?.[1] as RequestInit).body))).toMatchObject({
       inputs: {
-        artifactKind: 'Open Design plugin',
-        audience: 'Open Design plugin authors',
-        topic: 'packaging a reusable workflow as an Open Design plugin',
+        artifactKind: 'Open Maker plugin',
+        audience: 'Open Maker plugin authors',
+        topic: 'packaging a reusable workflow as an Open Maker plugin',
       },
     });
     await waitFor(() => {
@@ -415,9 +415,9 @@ describe('HomeView prompt handoff', () => {
       pluginId: 'od-new-generation',
       appliedPluginSnapshotId: 'snap-default',
       pluginInputs: {
-        artifactKind: 'Open Design plugin',
-        audience: 'Open Design plugin authors',
-        topic: 'packaging a reusable workflow as an Open Design plugin',
+        artifactKind: 'Open Maker plugin',
+        audience: 'Open Maker plugin authors',
+        topic: 'packaging a reusable workflow as an Open Maker plugin',
       },
       projectKind: 'other',
     }));

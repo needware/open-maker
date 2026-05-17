@@ -23,7 +23,7 @@ export const PLUGIN_AUTHORING_GOAL_INPUT = 'pluginGoal';
 export const PLUGIN_AUTHORING_DEFAULT_GOAL = "a reusable workflow described by the user's prompt";
 
 export const PLUGIN_AUTHORING_PROMPT_TEMPLATE = [
-  `Create an Open Design plugin for: {{${PLUGIN_AUTHORING_GOAL_INPUT}}}.`,
+  `Create an Open Maker plugin for: {{${PLUGIN_AUTHORING_GOAL_INPUT}}}.`,
   '',
   'Run the agent-assisted plugin authoring flow end to end. Follow docs/plugins-spec.md and produce a folder named generated-plugin with:',
   '- SKILL.md describing the agent behavior and workflow',
@@ -32,7 +32,7 @@ export const PLUGIN_AUTHORING_PROMPT_TEMPLATE = [
   '',
   'Then run or prepare the CLI path: od plugin validate, od plugin pack, local install/run validation, od plugin whoami/login through gh, and od plugin publish when the user is ready to open a registry PR.',
   '',
-  'When finished, summarize files created, validation status, local install/run status, pack output, and the exact publish command or PR next step. End by clearly offering the next actions: Add to My plugins, Publish repo, or Open Design PR.',
+  'When finished, summarize files created, validation status, local install/run status, pack output, and the exact publish command or PR next step. End by clearly offering the next actions: Add to My plugins, Publish repo, or Open Maker PR.',
 ].join('\n');
 
 export const PLUGIN_AUTHORING_PROMPT = buildPluginAuthoringPrompt(PLUGIN_AUTHORING_DEFAULT_GOAL);

@@ -1,4 +1,4 @@
-// Use Open Design Everywhere — modal entry that documents Open Design's
+// Use Open Maker Everywhere — modal entry that documents Open Maker's
 // non-UI surfaces (CLI, MCP, HTTP, Skills) and ships a one-click "copy
 // guide for an agent" payload. Reachable from the entry top-bar and
 // from Settings → Integrations as a sibling of the existing MCP install
@@ -26,7 +26,7 @@ interface Props {
   onOpenSettings?: () => void;
   /** Live daemon URL when known (e.g. http://127.0.0.1:7456). */
   daemonUrl?: string;
-  /** Optional Open Design version string surfaced in the agent guide header. */
+  /** Optional Open Maker version string surfaced in the agent guide header. */
   versionHint?: string;
 }
 
@@ -67,7 +67,7 @@ export function UseEverywhereModal({
       className="use-everywhere-modal-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label="Use Open Design everywhere"
+      aria-label="Use Open Maker everywhere"
       data-testid="use-everywhere-modal"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -78,10 +78,10 @@ export function UseEverywhereModal({
           <div className="use-everywhere-modal__head-titles">
             <span className="use-everywhere-modal__kicker">Integrations</span>
             <h2 className="use-everywhere-modal__title">
-              Use Open Design everywhere
+              Use Open Maker everywhere
             </h2>
             <p className="use-everywhere-modal__subtitle">
-              Drop Open Design into any IDE, agent, or script — CLI, HTTP, MCP,
+              Drop Open Maker into any IDE, agent, or script — CLI, HTTP, MCP,
               and Skills. Use “Copy guide for an agent” and paste into Claude
               Code, Codex, Cursor, openclaw, or hermes to set up everything.
             </p>

@@ -44,8 +44,11 @@ import {
 import { applyAppearanceToDocument } from './state/appearance';
 import { isMacPlatform } from './utils/platform';
 import {
+  createProject,
+  createPluginShareProject,
   deleteProject as deleteProjectApi,
   deleteTemplate,
+  importClaudeDesignZip,
   listProjects,
   listRecentProjects,
   listTemplates,
@@ -53,18 +56,31 @@ import {
   patchProject,
   type RecentProjectEntry,
 } from './state/projects';
+import type {
+  PluginShareAction,
+  PluginShareProjectOutcome,
+} from './state/projects';
+import {
+  switchApiProtocolConfig,
+  updateCurrentApiProtocolConfig,
+} from './components/SettingsDialog';
+import { uploadProjectFiles } from './providers/registry';
+import type { CreateInput } from './components/NewProjectPanel';
 import { useI18n } from './i18n';
 import { liveArtifactTabId } from './types';
 import type {
   AgentInfo,
+  ApiProtocol,
   AppConfig,
   AppVersionInfo,
+  ChatAttachment,
   DesignSystemSummary,
   Project,
   ProjectTemplate,
   PromptTemplateSummary,
   SkillSummary,
 } from './types';
+import type { IntegrationTab } from './components/IntegrationsView';
 
 export function shouldSyncMediaProvidersOnSave(
   mediaProviders: AppConfig['mediaProviders'],
@@ -642,6 +658,45 @@ export function App() {
     [config],
   );
 
+  // BYOK protocol switch — also flips `mode` to 'api' so the user does
+  // not have to take a second step after picking a provider from the
+  // inline switcher. The helper preserves any per-protocol fields the
+  // user had previously configured for the target protocol.
+  const handleApiProtocolChange = useCallback(
+    (protocol: ApiProtocol) => {
+      const next = switchApiProtocolConfig(config, protocol);
+      saveConfig(next);
+      void syncConfigToDaemon(next);
+      setConfig(next);
+    },
+    [config],
+  );
+
+  // BYOK model picker — patches `model` (and the per-protocol shadow
+  // copy) without touching apiKey/baseUrl so the user can swap models
+  // mid-session without retyping their key.
+  const handleApiModelChange = useCallback(
+    (model: string) => {
+      const next = updateCurrentApiProtocolConfig(config, { model });
+      saveConfig(next);
+      void syncConfigToDaemon(next);
+      setConfig(next);
+    },
+    [config],
+  );
+
+  // Quick theme switch from the avatar-popover dropdown. Persists locally
+  // and to the daemon so the choice survives reloads.
+  const handleThemeChange = useCallback(
+    (theme: AppConfig['theme']) => {
+      const next = { ...config, theme };
+      saveConfig(next);
+      void syncConfigToDaemon(next);
+      setConfig(next);
+    },
+    [config],
+  );
+
   const handleChangeDefaultDesignSystem = useCallback(
     (designSystemId: string) => {
       const next = { ...config, designSystemId };
@@ -678,13 +733,188 @@ export function App() {
   // facets created INSIDE an opened project (slice 3 and §"Open
   // questions / future work" in the RFC).
 
+  // PluginLoopHome / NewProjectModal create flow — kept around for the
+  // upstream chat-first home experience. The daemon stamps a scratch
+  // baseDir for every project that does not arrive via folder import,
+  // so the RFC project-as-unit invariant still holds at the row level.
+  const handleCreateProject = useCallback(
+    async (
+      input: CreateInput & {
+        pendingPrompt?: string;
+        pluginId?: string;
+        appliedPluginSnapshotId?: string;
+        pluginInputs?: Record<string, unknown>;
+        autoSendFirstMessage?: boolean;
+        requestId?: string;
+        pendingFiles?: File[];
+      },
+    ) => {
+      const derivedPendingPrompt =
+        input.pendingPrompt ??
+        (input.metadata?.promptTemplate?.prompt?.trim() || undefined);
+      const kind = input.metadata?.kind ?? null;
+      const fidelity = fidelityToTracking(input.metadata?.fidelity ?? null);
+      const creationSource: 'blank' | 'template' | 'zip' | 'folder' =
+        kind === 'template' ? 'template' : 'blank';
+      const result = await createProject({
+        name: input.name,
+        skillId: input.skillId,
+        designSystemId: input.designSystemId,
+        pendingPrompt: derivedPendingPrompt,
+        metadata: input.metadata,
+        ...(input.pluginId ? { pluginId: input.pluginId } : {}),
+        ...(input.appliedPluginSnapshotId
+          ? { appliedPluginSnapshotId: input.appliedPluginSnapshotId }
+          : {}),
+        ...(input.pluginInputs ? { pluginInputs: input.pluginInputs } : {}),
+      });
+      if (!result) {
+        trackProjectCreateResult(
+          analytics.track,
+          {
+            page: 'home',
+            area: 'create_panel',
+            action_source: 'create_button',
+            project_id: null,
+            project_kind: projectKindToTracking(kind),
+            creation_source: creationSource,
+            fidelity,
+            result: 'failed',
+            error_code: 'CREATE_REQUEST_FAILED',
+          },
+          { requestId: input.requestId },
+        );
+        return;
+      }
+      const pendingFiles = Array.isArray(input.pendingFiles)
+        ? input.pendingFiles.filter((file): file is File => file instanceof File)
+        : [];
+      let firstMessageAttachments: ChatAttachment[] = [];
+      if (pendingFiles.length > 0) {
+        const uploadResult = await uploadProjectFiles(result.project.id, pendingFiles);
+        firstMessageAttachments = uploadResult.uploaded;
+        if (uploadResult.failed.length > 0) {
+          console.warn('Some Home attachments failed to upload', uploadResult.failed);
+        }
+      }
+      trackProjectCreateResult(
+        analytics.track,
+        {
+          page: 'home',
+          area: 'create_panel',
+          action_source: 'create_button',
+          project_id: result.project.id,
+          project_kind: projectKindToTracking(kind),
+          creation_source: creationSource,
+          fidelity,
+          result: 'success',
+        },
+        { requestId: input.requestId },
+      );
+      if (
+        input.autoSendFirstMessage &&
+        (derivedPendingPrompt !== undefined || firstMessageAttachments.length > 0)
+      ) {
+        try {
+          window.sessionStorage.setItem(
+            `od:auto-send-first:${result.project.id}`,
+            '1',
+          );
+          if (firstMessageAttachments.length > 0) {
+            window.sessionStorage.setItem(
+              `od:auto-send-attachments:${result.project.id}`,
+              JSON.stringify(firstMessageAttachments),
+            );
+          } else {
+            window.sessionStorage.removeItem(
+              `od:auto-send-attachments:${result.project.id}`,
+            );
+          }
+        } catch {
+          /* sessionStorage may be unavailable */
+        }
+      }
+      const project = result.appliedPluginSnapshotId
+        ? {
+            ...result.project,
+            appliedPluginSnapshotId: result.appliedPluginSnapshotId,
+          }
+        : result.project;
+      setProjects((curr) => [
+        project,
+        ...curr.filter((p) => p.id !== project.id),
+      ]);
+      navigate({
+        kind: 'project',
+        projectId: project.id,
+        fileName: null,
+      });
+    },
+    [analytics.track],
+  );
+
+  const handleCreatePluginShareProject = useCallback(
+    async (
+      pluginId: string,
+      action: PluginShareAction,
+      locale?: string,
+    ): Promise<PluginShareProjectOutcome> => {
+      const outcome = await createPluginShareProject(pluginId, action, locale);
+      if (!outcome.ok) return outcome;
+      try {
+        window.sessionStorage.setItem(
+          `od:auto-send-first:${outcome.project.id}`,
+          '1',
+        );
+      } catch {
+        /* sessionStorage may be unavailable */
+      }
+      const project = outcome.appliedPluginSnapshotId
+        ? {
+            ...outcome.project,
+            appliedPluginSnapshotId: outcome.appliedPluginSnapshotId,
+          }
+        : outcome.project;
+      setProjects((curr) => [
+        project,
+        ...curr.filter((p) => p.id !== project.id),
+      ]);
+      navigate({
+        kind: 'project',
+        projectId: project.id,
+        fileName: null,
+      });
+      return outcome;
+    },
+    [],
+  );
+
+  const handleImportClaudeDesign = useCallback(async (file: File) => {
+    const result = await importClaudeDesignZip(file);
+    if (!result) return;
+    setProjects((curr) => [
+      result.project,
+      ...curr.filter((p) => p.id !== result.project.id),
+    ]);
+    navigate({
+      kind: 'project',
+      projectId: result.project.id,
+      fileName: result.entryFile,
+    });
+  }, []);
+
   // Per RFC project-as-unit: opening a folder IS creating a project.
   // Idempotent — re-opening the same realpath returns the existing row,
   // so this also drives the homepage's "Recent" list (clicking a recent
   // entry calls openProject which de-dupes server-side).
-  const handleImportFolder = useCallback(async (baseDir: string) => {
+  //
+  // Returns `true` when the folder opened successfully so the upstream
+  // ProjectSwitcher popover / HomeView "From folder" chip can close
+  // themselves on success and stay open (with their busy state cleared
+  // by the caller) on failure.
+  const handleImportFolder = useCallback(async (baseDir: string): Promise<boolean> => {
     const result = await openProject({ path: baseDir });
-    if (!result) return;
+    if (!result) return false;
     setProjects((curr) => [result.project, ...curr.filter((p) => p.id !== result.project.id)]);
     // Refresh recent list in the background so the homepage list order
     // updates after a successful open. Failure is non-fatal.
@@ -699,6 +929,7 @@ export function App() {
       projectId: result.project.id,
       fileName: result.entryFile ?? null,
     });
+    return true;
   }, []);
 
   // PR #974: on Electron, the desktop main process owns the picker and
@@ -968,16 +1199,27 @@ export function App() {
           designTemplates={enabledDesignTemplates}
           designSystems={enabledDS}
           projects={projects}
-          recentProjects={recentProjects}
-          recentHomeDir={recentHomeDir}
+          templates={templates}
+          onDeleteTemplate={handleDeleteTemplate}
           promptTemplates={promptTemplates}
           defaultDesignSystemId={config.designSystemId}
-          config={config}
           agents={agents}
+          config={config}
+          composioConfigLoading={composioConfigLoading}
+          daemonLive={daemonLive}
+          onModeChange={handleModeChange}
+          onAgentChange={handleAgentChange}
+          onAgentModelChange={handleAgentModelChange}
+          onApiProtocolChange={handleApiProtocolChange}
+          onApiModelChange={handleApiModelChange}
+          onThemeChange={handleThemeChange}
           skillsLoading={skillsLoading}
           designSystemsLoading={dsLoading}
           projectsLoading={projectsLoading}
           promptTemplatesLoading={promptTemplatesLoading}
+          onCreateProject={handleCreateProject}
+          onCreatePluginShareProject={handleCreatePluginShareProject}
+          onImportClaudeDesign={handleImportClaudeDesign}
           onImportFolder={handleImportFolder}
           onImportFolderResponse={handleImportFolderResponse}
           onOpenProject={handleOpenProject}
@@ -985,10 +1227,8 @@ export function App() {
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
           onChangeDefaultDesignSystem={handleChangeDefaultDesignSystem}
+          onPersistComposioKey={handleConfigPersistComposioKey}
           onOpenSettings={openSettings}
-          onAdoptPet={openPetSettings}
-          onAdoptPetInline={handleAdoptPet}
-          onTogglePet={handleTogglePet}
         />
       )}
       <PetOverlay
