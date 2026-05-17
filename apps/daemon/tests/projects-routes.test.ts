@@ -77,7 +77,7 @@ describe('GET /api/projects/:id resolvedDir', () => {
     expect(detail.resolvedDir).toBe(baseDir);
   });
 
-  it('returns resolvedDir under <projects root>/<id> for a native project', async () => {
+  it('provisions a scratch baseDir under <projects root>/scratch for a native project', async () => {
     const projectId = `proj-routes-${Date.now()}`;
     const createResp = await fetch(`${baseUrl}/api/projects`, {
       method: 'POST',
@@ -97,12 +97,21 @@ describe('GET /api/projects/:id resolvedDir', () => {
       project: { id: string; metadata?: { baseDir?: string } };
       resolvedDir: string;
     };
-    expect(detail.project.metadata?.baseDir).toBeUndefined();
+    // Per RFC project-as-unit, every project must own a real directory
+    // on disk. Folder-imported projects use the user-chosen path; all
+    // other create paths (this is the "native" / chat-first flow) get
+    // a daemon-provisioned scratch directory under
+    // <projectsRoot>/scratch/. The stamped baseDir must be the same
+    // path the GET endpoint returns as resolvedDir.
+    const baseDir = detail.project.metadata?.baseDir;
+    expect(typeof baseDir).toBe('string');
+    expect(baseDir).toBeTruthy();
 
     const dataDir = process.env.OD_DATA_DIR;
     if (!dataDir) throw new Error('OD_DATA_DIR is required for daemon route tests');
-    const expected = path.join(dataDir, 'projects', projectId);
-    expect(detail.resolvedDir).toBe(expected);
+    const scratchRoot = path.join(dataDir, 'projects', 'scratch');
+    expect(baseDir!.startsWith(scratchRoot + path.sep)).toBe(true);
+    expect(detail.resolvedDir).toBe(baseDir);
     expect(path.isAbsolute(detail.resolvedDir)).toBe(true);
   });
 

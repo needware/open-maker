@@ -3527,86 +3527,15 @@ export async function startServer({
     }
   });
 
-  app.get('/api/projects/:id', (req, res) => {
-    const project = getProject(db, req.params.id);
-    if (!project)
-      return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'not found');
-    /** @type {import('@open-design/contracts').ProjectResponse} */
-    const body = { project };
-    res.json(body);
-  });
-
-  app.patch('/api/projects/:id', (req, res) => {
-    try {
-      const patch = req.body || {};
-      // baseDir / folder-import state is privileged: it's set only by the
-      // import endpoint and otherwise immutable. Two failure modes to
-      // guard against here:
-      //   1. Explicit attempt to change baseDir → reject with 400.
-      //   2. A regular metadata patch that *omits* baseDir (e.g. a UI
-      //      that only edits linkedDirs sends `{ metadata: { kind, linkedDirs } }`).
-      //      updateProject() replaces metadata wholesale, so without
-      //      preservation the existing baseDir gets wiped and the project
-      //      detaches from the user's folder — subsequent reads/writes
-      //      silently fall back to .od/projects/<id>.
-      // For case 2 we re-stamp the immutable fields from the existing
-      // project record onto the incoming patch so the user can keep
-      // patching other metadata without ever losing their import root.
-      if (patch.metadata && typeof patch.metadata === 'object') {
-        const existing = getProject(db, req.params.id);
-        const existingMeta = existing?.metadata;
-        if (existingMeta?.baseDir) {
-          if ('baseDir' in patch.metadata && patch.metadata.baseDir !== existingMeta.baseDir) {
-            return sendApiError(
-              res, 400, 'BAD_REQUEST',
-              'baseDir is immutable after import; use a new import to change it',
-            );
-          }
-          patch.metadata = {
-            ...patch.metadata,
-            baseDir: existingMeta.baseDir,
-            ...(existingMeta.importedFrom === 'folder'
-              ? { importedFrom: 'folder' }
-              : {}),
-          };
-        } else if ('baseDir' in patch.metadata) {
-          // Non-imported project trying to acquire a baseDir → reject (only
-          // /api/import/folder can set it).
-          return sendApiError(
-            res, 400, 'BAD_REQUEST',
-            'baseDir can only be set via POST /api/import/folder',
-          );
-        }
-      }
-      if (patch.metadata?.linkedDirs) {
-        const validated = validateLinkedDirs(patch.metadata.linkedDirs);
-        if (validated.error) {
-          return sendApiError(res, 400, 'INVALID_LINKED_DIR', validated.error);
-        }
-        patch.metadata.linkedDirs = validated.dirs;
-      }
-      const project = updateProject(db, req.params.id, patch);
-      if (!project)
-        return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'not found');
-      /** @type {import('@open-design/contracts').ProjectResponse} */
-      const body = { project };
-      res.json(body);
-    } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', String(err));
-    }
-  });
-
-  app.delete('/api/projects/:id', async (req, res) => {
-    try {
-      dbDeleteProject(db, req.params.id);
-      await removeProjectDir(PROJECTS_DIR, req.params.id).catch(() => {});
-      /** @type {import('@open-design/contracts').OkResponse} */
-      const body = { ok: true };
-      res.json(body);
-    } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', String(err));
-    }
-  });
+  // GET / PATCH / DELETE /api/projects/:id are owned by
+  // `registerProjectRoutes` in `project-routes.ts`. The duplicates that
+  // used to live here (returning `{ project }` without `resolvedDir`,
+  // and PATCH without the `fromTrustedPicker` rejection) were dead in
+  // production — `registerProjectRoutes` runs later in this function
+  // but Express picks the first registration, so the stale copies
+  // shadowed the up-to-date upstream handlers. Removing them lets the
+  // project-routes versions take effect (added `resolvedDir`,
+  // `fromTrustedPicker` immutability guard, baseDir provisioning).
 
   // SSE stream of file-changed events for a project. Drives preview live-reload.
   // Receipt of a `file-changed` event triggers a file-list refresh, which
@@ -6161,6 +6090,7 @@ export async function startServer({
   };
   const projectFileDeps = {
     ensureProject,
+    createScratchProjectDir,
     listFiles,
     searchProjectFiles,
     readProjectFile,
@@ -6431,17 +6361,9 @@ export async function startServer({
     research: researchDeps,
   });
 
-  app.delete('/api/projects/:id', async (req, res) => {
-    try {
-      dbDeleteProject(db, req.params.id);
-      await removeProjectDir(PROJECTS_DIR, req.params.id).catch(() => {});
-      /** @type {import('@open-design/contracts').OkResponse} */
-      const body = { ok: true };
-      res.json(body);
-    } catch (err) {
-      sendApiError(res, 400, 'BAD_REQUEST', String(err));
-    }
-  });
+  // DELETE /api/projects/:id is registered by `registerProjectRoutes`
+  // above. A stale duplicate copy used to live here; removed for the
+  // same reasoning documented near the older GET/PATCH duplicates.
 
   // SSE stream of file-changed events for a project. Drives preview live-reload.
   // Receipt of a `file-changed` event triggers a file-list refresh, which

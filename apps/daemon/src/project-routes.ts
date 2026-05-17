@@ -21,7 +21,7 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
   const { sendApiError, createSseResponse } = ctx.http;
   const { DESIGN_SYSTEMS_DIR, PROJECTS_DIR, SKILLS_DIR } = ctx.paths;
   const { insertProject, validateLinkedDirs, getProject, updateProject, dbDeleteProject, removeProjectDir } = ctx.projectStore;
-  const { writeProjectFile, readProjectFile, ensureProject, listFiles, listTabs, setTabs, resolveProjectDir } = ctx.projectFiles;
+  const { writeProjectFile, readProjectFile, ensureProject, listFiles, listTabs, setTabs, resolveProjectDir, createScratchProjectDir } = ctx.projectFiles;
   const { insertConversation, getConversation, listConversations, updateConversation, deleteConversation, listMessages, upsertMessage, listPreviewComments, upsertPreviewComment, updatePreviewCommentStatus, deletePreviewComment } = ctx.conversations;
   const { getTemplate, listTemplates, deleteTemplate, insertTemplate, findTemplateByNameAndProject, updateTemplate } = ctx.templates;
   const { listLatestProjectRunStatuses, listProjectsAwaitingInput, normalizeProjectDisplayStatus, composeProjectDisplayStatus, listProjects } = ctx.status;
@@ -165,7 +165,7 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
       if (skipDiscoveryBrief !== undefined && typeof skipDiscoveryBrief !== 'boolean') {
         return sendApiError(res, 400, 'BAD_REQUEST', 'skipDiscoveryBrief must be a boolean');
       }
-      const projectMetadata =
+      const baseMetadata =
         metadata && typeof metadata === 'object'
           ? {
               ...metadata,
@@ -180,6 +180,24 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
           : skipDiscoveryBrief === true
             ? { skipDiscoveryBrief: true }
             : null;
+      // Per RFC project-as-unit, every project IS a directory on disk:
+      // folder-imported projects get a user-owned `metadata.baseDir`
+      // via the privileged `/api/import/folder` endpoint, and every
+      // other create path (chat-first Home, plugin scenarios, template
+      // kicks, scripted creation) provisions a scratch directory under
+      // `<projectsRoot>/scratch/` and stamps that path as baseDir. This
+      // keeps the startup invariant `enforceProjectAsUnitInvariant`
+      // satisfied across daemon restarts (legacy rows missing baseDir
+      // would refuse to boot), and gives downstream code that resolves
+      // `metadata.baseDir` (generated artifacts, file listings, MCP
+      // exposure) a real, addressable directory instead of leaning on
+      // the soon-to-be-removed legacy `<projectsRoot>/<id>` fallback.
+      const scratchPrefix = `create-${(baseMetadata?.kind ?? 'other')}`;
+      const scratchBaseDir = await createScratchProjectDir(PROJECTS_DIR, scratchPrefix);
+      const projectMetadata = {
+        ...(baseMetadata ?? {}),
+        baseDir: scratchBaseDir,
+      };
       const now = Date.now();
       const project = insertProject(db, {
         id,
