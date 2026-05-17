@@ -6,14 +6,17 @@ records module-level boundaries for `apps/landing-page/`.
 ## Purpose
 
 `apps/landing-page` is a stand-alone static Astro site that renders
-the canonical Open Maker marketing page in the **Atelier Zero** style.
-It is the deployable counterpart to:
+the **Open Maker** marketing surface in the **Atelier Zero** style and
+ships per-facet catalog pages for every skill, design system, craft
+principle, and live-artifact template in the repo root.
 
-- Skill: `skills/open-maker-landing/` — agent workflow + the source-of-truth
-  `example.html` known-good rendering.
+Tightly coupled with:
+
+- Design template: `design-templates/open-design-landing/` — agent workflow + the source-of-truth
+  `example.html` known-good rendering for the homepage hero.
 - Design system: `design-systems/atelier-zero/DESIGN.md` — token spec.
-- Image assets: `skills/open-maker-landing/assets/*.png` are uploaded to
-  Cloudflare R2 (`open-maker-static`) and served through
+- Image assets: `design-templates/open-design-landing/assets/*.png` are uploaded to
+  Cloudflare R2 (`open-design-static`) and served through
   `static.open-design.ai` with Image Resizing (`format=auto`). Do not
   commit local mirrored PNGs into `apps/landing-page/public/assets/`.
 
@@ -41,7 +44,7 @@ It is the deployable counterpart to:
   CDN-ready HTML/CSS plus a small inline enhancement script;
   no React runtime ships to browsers.
 - All styles split between `app/globals.css` (homepage, kept in
-  lockstep with `skills/open-design-landing/example.html`) and
+  lockstep with `design-templates/open-design-landing/example.html`) and
   `app/sub-pages.css` (catalog/facet/detail pages).
 - All page imagery is referenced through `app/image-assets.ts`, which
   builds Cloudflare Image Resizing URLs for the R2 originals.
@@ -67,24 +70,51 @@ It is the deployable counterpart to:
 ## Boundary constraints
 
 - Must remain a static Astro output.
-- Must not import from `@open-maker/web`, `@open-maker/daemon`,
-  `@open-maker/desktop`, `@open-maker/sidecar*`, or
-  `@open-maker/contracts`. Those are product runtime concerns.
-- Must not introduce a `src/` shell — keep all source under
-  `app/`. If a component grows beyond ~80 lines, extract it to
-  `app/_components/<name>.tsx`.
+- Must not import from `@open-design/web`, `@open-design/daemon`,
+  `@open-design/desktop`, `@open-design/sidecar*`, or
+  `@open-design/contracts`. Those are product runtime concerns.
+- Must not introduce a `src/` shell — keep all source under `app/`.
+  Component bundles live in `app/_components/<name>.{tsx,astro}`.
 - Must not depend on any non-Google web font.
-- When the canonical `skills/open-maker-landing/example.html` changes,
-  the corresponding section JSX in `app/page.tsx` and rules in
-  `app/globals.css` must be updated to match. The two files are kept
-  in lockstep.
+- Visible "X skills" / "Y systems" claims must read from
+  `getCatalogCounts()` — never hardcode. The hero, capabilities cards,
+  labs pills, selected-work fractions, footer Library, and
+  `<meta name="description">` all derive from the same call so a
+  fresh content edit can never publish contradictory totals.
+- When the canonical `design-templates/open-design-landing/example.html`
+  changes, the corresponding section JSX in `app/page.tsx` and rules
+  in `app/globals.css` must be updated to match. Those two files are
+  kept in lockstep; the rest of the landing-page sources are not.
+- Content-collection schemas in `app/content.config.ts` stay loose
+  (`passthrough()`). Validation lives at render time so vendored
+  upstream Markdown (e.g., `guizang-ppt`) doesn't break the build
+  when an author uses a slightly different `od:` key.
+
+## Auto-deploy contract
+
+`.github/workflows/landing-page-deploy.yml` runs on push to `main`
+when **any** of these change:
+
+- `apps/landing-page/**`
+- `skills/**`
+- `design-systems/**`
+- `craft/**`
+- `templates/**`
+- `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`
+- the workflow file itself
+
+A push that only edits a SKILL.md MUST trigger this workflow — if it
+doesn't, the `paths:` filter has drifted from the content-collection
+glob and the published site will fall behind silently. Treat that as
+a regression, not a feature.
 
 ## Common commands
 
 ```bash
-pnpm --filter @open-maker/landing-page dev          # http://127.0.0.1:17574
-pnpm --filter @open-maker/landing-page build        # static export → out/
-pnpm --filter @open-maker/landing-page typecheck
+pnpm --filter @open-design/landing-page dev          # http://127.0.0.1:17574
+pnpm --filter @open-design/landing-page typecheck
+pnpm --filter @open-design/landing-page previews     # render thumbnails
+pnpm --filter @open-design/landing-page build        # static export → out/
 ```
 
 ## When to update this app
@@ -98,6 +128,6 @@ pnpm --filter @open-maker/landing-page typecheck
   and route entries that match the existing index/detail/facet pattern.
 - New section added to the canonical landing page → port it into
   `app/page.tsx` and `app/globals.css` keeping lockstep with
-  `skills/open-design-landing/example.html`.
+  `design-templates/open-design-landing/example.html`.
 - Brand re-keying for a non-Open-Design tenant → fork the app, update
   copy, swap PNGs. Do not parameterize this app for multi-tenancy.
