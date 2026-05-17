@@ -285,6 +285,12 @@ export async function generateMedia(args: {
   prompt?: string; output?: string; aspect?: string; length?: number; duration?: number; voice?: string;
   audioKind?: AudioKind; language?: string; loop?: boolean; promptInfluence?: number;
   compositionDir?: string; image?: string; onProgress?: ProgressFn;
+  // Project metadata (from the projects row). When `metadata.baseDir` is set
+  // (folder-imported projects, RFC project-as-unit), generated files land
+  // alongside the user's source files — NOT under `.od/projects/<id>/`.
+  // Optional for legacy callers/tests that still rely on the projectsRoot
+  // fallback; production routes always pass it.
+  metadata?: Record<string, unknown> | null;
 }) {
   const {
     projectRoot,
@@ -304,6 +310,7 @@ export async function generateMedia(args: {
     promptInfluence,
     compositionDir,
     image,
+    metadata,
   } = args;
 
   if (!projectRoot) throw new Error('projectRoot required');
@@ -366,7 +373,7 @@ export async function generateMedia(args: {
     : durationClamp.value;
   const warnings = [lengthClamp.warning, durationClamp.warning].filter(Boolean);
 
-  const dir = await ensureProject(projectsRoot, projectId);
+  const dir = await ensureProject(projectsRoot, projectId, metadata ?? undefined);
   const safeOut = sanitizeName(
     output || autoOutputName(surface, model, resolvedAudioKind),
   );

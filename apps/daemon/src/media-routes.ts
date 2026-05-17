@@ -169,6 +169,7 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
         projectRoot: PROJECT_ROOT,
         projectsRoot: PROJECTS_DIR,
         projectId,
+        metadata: (project as any)?.metadata ?? null,
         surface: req.body?.surface,
         model: req.body?.model,
         prompt: req.body?.prompt,
