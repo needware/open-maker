@@ -16846,8 +16846,224 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
 }
 
 /* ============================================================
-   Pet — discovery surfaces (welcome teaser, composer)
+   Pet — discovery surfaces (right rail, welcome teaser, composer)
    ============================================================ */
+
+/* Right-side rail in the entry view. Renders as a third grid column
+   (the entry's gridTemplateColumns is set inline to `… 1fr auto`). */
+.pet-rail {
+  width: 232px;
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  padding: 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.pet-rail.collapsed {
+  width: 36px;
+  padding: 18px 4px;
+  align-items: center;
+}
+.pet-rail-toggle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 100%;
+}
+.pet-rail-toggle:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+.pet-rail-toggle-glyph {
+  font-size: 18px;
+  line-height: 1;
+}
+.pet-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.pet-rail-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pet-rail-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.pet-rail-title strong {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pet-rail-collapse {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.pet-rail-collapse > svg {
+  flex-shrink: 0;
+}
+.pet-rail-collapse:hover {
+  background: var(--bg-muted);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+.pet-rail-collapse:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(201, 100, 66, 0.32);
+  border-color: var(--accent);
+}
+.pet-rail-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.45;
+}
+.pet-rail-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pet-rail-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+}
+.pet-rail-fresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  border: 1px dashed var(--accent);
+}
+.pet-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pet-rail-item {
+  --pet-accent: var(--accent);
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+}
+.pet-rail-item:hover {
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+.pet-rail-item.active {
+  border-color: var(--pet-accent);
+  background: color-mix(in srgb, var(--pet-accent) 8%, transparent);
+}
+.pet-rail-item.custom {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.pet-rail-item.custom.active {
+  border-style: solid;
+  border-color: var(--pet-accent);
+}
+.pet-rail-item-glyph {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--pet-accent) 14%, transparent);
+}
+.pet-rail-item-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pet-rail-item-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pet-rail-item-flavor {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pet-rail-customize {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.pet-rail-customize:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* Hide the rail on small viewports so it does not crowd the main column. */
+@media (max-width: 1100px) {
+  .pet-rail:not(.collapsed) {
+    display: none;
+  }
+}
 
 /* ----- Welcome dialog teaser ----- */
 .welcome-pet-teaser {
@@ -17954,6 +18170,7 @@ body.entry-resizing { cursor: col-resize; user-select: none; }
 [dir="rtl"] .icon-only svg[data-lucide="chevron-right"],
 [dir="rtl"] .icon-only svg[data-lucide="arrow-left"],
 [dir="rtl"] .icon-only svg[data-lucide="arrow-right"],
+[dir="rtl"] .pet-rail-collapse svg,
 [dir="rtl"] .welcome-pet-teaser svg {
   transform: scaleX(-1);
 }
