@@ -79,6 +79,14 @@ interface Props {
    * panel where it was an alternative path).
    */
   onImportFolder: (baseDir: string) => Promise<void> | void;
+  /**
+   * PR #974 trust-boundary callback for the desktop atomic picker. The
+   * Electron main process owns the native picker + the HMAC-gated import
+   * POST; the renderer just receives the resulting ImportFolderResponse
+   * and folds it into App state. Optional so the web build (no electronAPI)
+   * can fall back to the path-based `onImportFolder` flow.
+   */
+  onImportFolderResponse?: (result: ImportFolderResponse) => Promise<void> | void;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
@@ -517,6 +525,7 @@ export function EntryView({
           recentProjects={recentProjects}
           homeDir={recentHomeDir}
           onImportFolder={onImportFolder}
+          onImportFolderResponse={onImportFolderResponse}
           onOpenPicker={openFolderPicker}
         />
       </AppChromeHeader>
@@ -673,7 +682,7 @@ export function EntryView({
               />
             )
           ) : null}
-          {topTab === 'templates' ? (
+          {topTab === 'examples' ? (
             skillsLoading ? (
               <CenteredLoader label={t('common.loading')} />
             ) : (
@@ -786,6 +795,7 @@ function ProjectSwitcherTrigger({
   recentProjects,
   homeDir,
   onImportFolder,
+  onImportFolderResponse,
   onOpenPicker,
 }: {
   /** Text shown in the trigger button. "Home" on the launcher; the
@@ -794,8 +804,12 @@ function ProjectSwitcherTrigger({
   recentProjects: RecentProjectEntry[];
   homeDir: string;
   onImportFolder?: (path: string) => Promise<void> | void;
+  /** PR #974 trust-boundary callback for the desktop atomic picker.
+   *  When present and `window.electronAPI.pickAndImport` is available,
+   *  the panel uses that flow instead of the path-based fallback. */
+  onImportFolderResponse?: (result: ImportFolderResponse) => Promise<void> | void;
   /** Open the in-app folder picker dialog. Used as the click-to-pick
-   *  fallback when `window.electronAPI.pickFolder` is unavailable. */
+   *  fallback when `window.electronAPI.pickAndImport` is unavailable. */
   onOpenPicker?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -910,6 +924,14 @@ function ProjectSwitcherTrigger({
             recentProjects={recentProjects}
             homeDir={homeDir}
             onImportFolder={handleImportFolder}
+            onImportFolderResponse={
+              onImportFolderResponse
+                ? async (result) => {
+                    await onImportFolderResponse(result);
+                    setOpen(false);
+                  }
+                : undefined
+            }
             onOpenPicker={
               onOpenPicker
                 ? () => {
@@ -1021,11 +1043,16 @@ function ProjectSwitcherPanel({
   recentProjects,
   homeDir,
   onImportFolder,
+  onImportFolderResponse,
   onOpenPicker,
 }: {
   recentProjects: RecentProjectEntry[];
   homeDir: string;
   onImportFolder?: (path: string) => Promise<void> | void;
+  /** PR #974 trust-boundary callback consuming the ImportFolderResponse
+   *  produced by the desktop atomic picker (`window.electronAPI.pickAndImport`).
+   *  When set, the popover prefers that flow over the path-based one. */
+  onImportFolderResponse?: (result: ImportFolderResponse) => Promise<void> | void;
   /** Open the in-app folder picker dialog. The popover prefers the
    *  native Electron picker when available; the dialog is the
    *  cross-platform fallback driven by the daemon's `/api/fs/ls`. */
@@ -1033,8 +1060,15 @@ function ProjectSwitcherPanel({
 }) {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  // PR #974 trust boundary: the renderer cannot receive raw paths from
+  // the main process, so we feature-detect the atomic `pickAndImport`
+  // bridge (path + HMAC + POST owned by main) instead of the forbidden
+  // `pickFolder`. Web builds have no electronAPI and fall through to
+  // `onOpenPicker` (the daemon-backed FolderPickerDialog).
   const hasElectronPicker =
-    typeof window !== 'undefined' && typeof window.electronAPI?.pickFolder === 'function';
+    typeof window !== 'undefined'
+    && typeof window.electronAPI?.pickAndImport === 'function'
+    && typeof onImportFolderResponse === 'function';
 
   // Filter the recent list against the query. Match against both the
   // tildified label (what the user sees) and the raw absolute path so
@@ -1050,12 +1084,12 @@ function ProjectSwitcherPanel({
   }, [query, recentProjects, homeDir]);
 
   async function handlePick() {
-    if (!onImportFolder || !hasElectronPicker) return;
+    if (!hasElectronPicker || !onImportFolderResponse) return;
     setBusy(true);
     try {
-      const picked = await window.electronAPI!.pickFolder!();
-      if (!picked) return;
-      await onImportFolder(picked);
+      const result = await window.electronAPI!.pickAndImport!();
+      if (!result || result.ok !== true) return;
+      await onImportFolderResponse(result.response);
     } finally {
       setBusy(false);
     }
