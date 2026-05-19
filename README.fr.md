@@ -1,9 +1,18 @@
-# Open Maker
+# Open Design
+
+> [!IMPORTANT]
+> ### 🔥 `0.8.0-preview` est là. L'ancien monde du design s'arrête ici.
+>
+> Une alternative open source et agent-native à Claude Design / Figma — 40k étoiles en deux semaines nous ont menés jusqu'ici. **Nous avons besoin de toi pour faire le reste du chemin.**
+>
+> **Itération rapide sur `main`** — 0.8.0 est la prochaine phase d'Open Design. Envoie une PR, balance une idée folle, signale un bug — ce que tu apportes, c'est ce que ce mouvement devient.
+>
+> → [**Lire l'annonce · télécharger l'installateur · rejoindre le mouvement**](https://github.com/nexu-io/open-design/discussions/1727) · s'installe à côté de votre 0.7 actuel.
 
 > **L’alternative open source à [Claude Design][cd].** Local-first, déployable sur le web, BYOK à chaque couche : vos CLI de coding agents détectées automatiquement dans le `PATH` deviennent le design engine, piloté par les catalogues de **Skills** et de **Design Systems** du repo. Aucune CLI ? Le proxy BYOK multi-provider exécute la même boucle, sans spawn local.
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Maker : couverture éditoriale, design avec l’agent sur votre laptop" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Design : couverture éditoriale, design avec l’agent sur votre laptop" width="100%" />
 </p>
 
 <p align="center">
@@ -35,7 +44,7 @@
 
 [Claude Design][cd] d’Anthropic, lancé le 17 avril 2026 avec Opus 4.7, a montré ce qui se passe lorsqu’un LLM cesse de produire seulement du texte et commence à livrer des design artifacts. Le produit est devenu viral, tout en restant closed-source, paid-only, cloud-only et lié au modèle comme aux Skills d’Anthropic. Aucun checkout possible, aucun self-hosting, aucun déploiement Vercel, aucun remplacement par votre propre agent.
 
-**Open Maker (OD) est l’alternative open source.** Même boucle, même mental model artifact-first, sans lock-in. Nous ne livrons pas d’agent : les meilleurs coding agents vivent déjà sur votre machine. OD les branche sur un workflow de design piloté par des Skills, exécutable localement avec `pnpm tools-dev`, déployable sur Vercel côté web, avec BYOK à chaque couche.
+**Open Design (OD) est l’alternative open source.** Même boucle, même mental model artifact-first, sans lock-in. Nous ne livrons pas d’agent : les meilleurs coding agents vivent déjà sur votre machine. OD les branche sur un workflow de design piloté par des Skills, exécutable localement avec `pnpm tools-dev`, déployable sur Vercel côté web, avec BYOK à chaque couche.
 
 Tapez `make me a magazine-style pitch deck for our seed round`. Le question form interactif apparaît avant que le modèle n’improvise le moindre pixel. L’agent choisit l’une des cinq directions visuelles soigneusement sélectionnées. Un plan `TodoWrite` live arrive dans l’UI. Le daemon crée un vrai dossier projet sur disque avec un seed template, une layout library et une checklist de self-check. L’agent les lit, le pre-flight est obligatoire, puis il lance une critique en cinq dimensions sur sa propre sortie et émet un seul `<artifact>`, rendu quelques secondes plus tard dans une iframe sandboxée.
 
@@ -275,7 +284,7 @@ Chaque couche est composable. Chaque couche est un fichier éditable. Lisez [`ap
    │  /api/upload          /api/projects/:id/files…
    │  /artifacts (static)  /frames (static)
    │
-   │  optional: sidecar IPC at /tmp/open-maker/ipc/<ns>/<app>.sock
+   │  optional: sidecar IPC at /tmp/open-design/ipc/<ns>/<app>.sock
    │  (STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN)
    └─────────┬────────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -303,7 +312,7 @@ Chaque couche est composable. Chaque couche est un fichier éditable. Lisez [`ap
 
 ### Télécharger l'application desktop (aucun build requis)
 
-Le moyen le plus rapide d'essayer Open Maker est l'application desktop préconstruite — pas de Node, pas de pnpm, pas de clone :
+Le moyen le plus rapide d'essayer Open Design est l'application desktop préconstruite — pas de Node, pas de pnpm, pas de clone :
 
 - **[open-design.ai](https://open-design.ai/)** — page de téléchargement officielle
 - **[Releases GitHub](https://github.com/nexu-io/open-design/releases)**
@@ -312,7 +321,7 @@ Le moyen le plus rapide d'essayer Open Maker est l'application desktop préconst
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-maker
+cd open-design
 corepack enable
 corepack pnpm --version   # should print 10.33.2
 pnpm install
@@ -358,7 +367,7 @@ Carte complète des fichiers, scripts et dépannage → [`QUICKSTART.fr.md`](QUI
 ## Structure du dépôt
 
 ```text
-open-maker/
+open-design/
 ├── README.md                      ← English
 ├── README.de.md                   ← Deutsch
 ├── README.zh-CN.md                ← 简体中文
@@ -400,7 +409,7 @@ open-maker/
 │
 ├── packages/
 │   ├── contracts/                 ← contrats app partagés web/daemon
-│   ├── sidecar-proto/             ← contrat du sidecar protocol Open Maker
+│   ├── sidecar-proto/             ← contrat du sidecar protocol Open Design
 │   ├── sidecar/                   ← primitives runtime sidecar génériques
 │   └── platform/                  ← primitives process/platform génériques
 │
@@ -548,7 +557,7 @@ Cliquez sur un thumbnail pour lire le MP4 rendu. Set complet → [`prompt-templa
 
 ### HyperFrames · motion graphics HTML→MP4 (11 templates prêts à reproduire)
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) est le framework vidéo open source agent-native de HeyGen : vous, ou l’agent, écrivez HTML + CSS + GSAP, HyperFrames rend un MP4 déterministe via Chrome headless + FFmpeg. Open Maker le livre comme modèle vidéo de première classe (`hyperframes-html`) relié au dispatch daemon, plus le skill `skills/hyperframes/` qui enseigne à l’agent le contrat de timeline, les transitions de scènes, les patterns audio-réactifs, captions/TTS et les catalog blocks (`npx hyperframes add <slug>`).
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) est le framework vidéo open source agent-native de HeyGen : vous, ou l’agent, écrivez HTML + CSS + GSAP, HyperFrames rend un MP4 déterministe via Chrome headless + FFmpeg. Open Design le livre comme modèle vidéo de première classe (`hyperframes-html`) relié au dispatch daemon, plus le skill `skills/hyperframes/` qui enseigne à l’agent le contrat de timeline, les transitions de scènes, les patterns audio-réactifs, captions/TTS et les catalog blocks (`npx hyperframes add <slug>`).
 
 Onze prompts hyperframes sont fournis sous [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/), chacun comme brief concret pour un archétype précis :
 
@@ -586,7 +595,7 @@ La boucle chat / artifact est la plus visible, mais plusieurs capacités moins e
 - **Templates utilisateur.** Une fois un rendu validé, `POST /api/templates` prend un snapshot du HTML + metadata dans la table SQLite `templates`. Le projet suivant peut le choisir depuis une ligne « your templates ».
 - **Persistance des tabs.** Chaque projet mémorise ses fichiers ouverts et son onglet actif dans la table `tabs`.
 - **Artifact lint API.** `POST /api/artifacts/lint` exécute des checks structurels sur un artifact généré et renvoie des findings que l’agent peut relire au tour suivant.
-- **Sidecar protocol + automation desktop.** Les processus daemon, web et desktop portent des stamps typés à cinq champs (`app · mode · namespace · ipc · source`) et exposent un canal JSON-RPC IPC sous `/tmp/open-maker/ipc/<namespace>/<app>.sock`.
+- **Sidecar protocol + automation desktop.** Les processus daemon, web et desktop portent des stamps typés à cinq champs (`app · mode · namespace · ipc · source`) et exposent un canal JSON-RPC IPC sous `/tmp/open-design/ipc/<namespace>/<app>.sock`.
 - **Spawning compatible Windows.** Les adapters qui dépasseraient la limite argv de `CreateProcess` envoient le prompt via stdin ; le daemon retombe sur un fichier prompt temporaire si besoin.
 - **Runtime data par namespace.** `OD_DATA_DIR` et `--namespace` donnent des arbres `.od/` isolés, pour que Playwright, les canaux beta et vos vrais projets ne partagent jamais le même SQLite.
 
@@ -603,7 +612,7 @@ Tout le mécanisme ci-dessous est le playbook [`huashu-design`](https://github.c
 
 ## Comparaison
 
-| Axe | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Maker** |
+| Axe | [Claude Design][cd] (Anthropic) | [Open CoDesign][ocod] | **Open Design** |
 |---|---|---|---|
 | Licence | Fermé | MIT | **Apache-2.0** |
 | Format | Web (claude.ai) | Desktop (Electron) | **Web app + daemon local** |
@@ -704,7 +713,7 @@ C’est une implémentation encore jeune, mais la boucle fermée fonctionne de b
 ## Star us
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Star Open Maker on GitHub : github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Star Open Design on GitHub : github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 Si ce projet vous a économisé trente minutes, donnez-lui une ★. Les stars ne paient pas le loyer, mais elles indiquent au prochain designer, agent ou contributeur que cette expérience mérite son attention : [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design).
@@ -721,10 +730,10 @@ Guide complet, critères de merge, style de code et refus fréquents → [`CONTR
 
 ## Contributeurs
 
-Merci à toutes les personnes qui font avancer Open Maker : code, docs, retours, nouveaux Skills, nouveaux Design Systems ou issues bien ciblées. Chaque vraie contribution compte.
+Merci à toutes les personnes qui font avancer Open Design : code, docs, retours, nouveaux Skills, nouveaux Design Systems ou issues bien ciblées. Chaque vraie contribution compte.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-16" alt="Contributeurs Open Maker" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-18" alt="Contributeurs Open Design" />
 </a>
 
 Si vous avez livré votre première PR, bienvenue. Le label [`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) est le point d’entrée.
@@ -732,7 +741,7 @@ Si vous avez livré votre première PR, bienvenue. Le label [`good-first-issue`/
 ## Activité du dépôt
 
 <picture>
-  <img alt="Open Maker : métriques du dépôt" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Design : métriques du dépôt" src="docs/assets/github-metrics.svg" />
 </picture>
 
 Le SVG ci-dessus est régénéré chaque jour par [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) avec [`lowlighter/metrics`](https://github.com/lowlighter/metrics). Lancez un refresh manuel depuis l’onglet **Actions** si vous le voulez plus tôt ; pour des plugins plus riches, ajoutez un secret `METRICS_TOKEN` avec un PAT fine-grained.
@@ -741,9 +750,9 @@ Le SVG ci-dessus est régénéré chaque jour par [`.github/workflows/metrics.ym
 
 <a href="https://star-history.com/#nexu-io/open-design&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-16" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-16" />
-    <img alt="Historique des stars Open Maker" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-16" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-18" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-18" />
+    <img alt="Historique des stars Open Design" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-18" />
   </picture>
 </a>
 

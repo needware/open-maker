@@ -99,13 +99,16 @@ interface Props {
     locale?: string,
   ) => Promise<PluginShareProjectOutcome>;
   onImportClaudeDesign: (file: File) => Promise<void> | void;
-  onImportFolder?: (baseDir: string) => Promise<boolean> | boolean;
+  onImportFolder?: (baseDir: string) => Promise<boolean> | boolean | Promise<void> | void;
   onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string, name: string) => void;
   onChangeDefaultDesignSystem: (id: string) => void;
+  onCreateDesignSystem?: () => void;
+  onOpenDesignSystem?: (id: string) => void;
+  onDesignSystemsRefresh?: () => Promise<void> | void;
   onPersistComposioKey: (composio: AppConfig['composio']) => Promise<void> | void;
   onOpenSettings: (section?: 'execution' | 'media' | 'composio' | 'orbit' | 'integrations' | 'mcpClient' | 'language' | 'appearance' | 'notifications' | 'pet' | 'library' | 'about') => void;
 }
@@ -266,6 +269,9 @@ export function EntryView({
   onDeleteProject,
   onRenameProject,
   onChangeDefaultDesignSystem,
+  onCreateDesignSystem,
+  onOpenDesignSystem,
+  onDesignSystemsRefresh,
   onPersistComposioKey,
   onOpenSettings,
 }: Props) {
@@ -350,7 +356,11 @@ export function EntryView({
       onOpenProject={onOpenProject}
       onOpenLiveArtifact={onOpenLiveArtifact}
       onDeleteProject={onDeleteProject}
+      onRenameProject={onRenameProject}
       onChangeDefaultDesignSystem={onChangeDefaultDesignSystem}
+      onCreateDesignSystem={onCreateDesignSystem}
+      onOpenDesignSystem={onOpenDesignSystem}
+      onDesignSystemsRefresh={onDesignSystemsRefresh}
       onPersistComposioKey={onPersistComposioKey}
       onOpenSettings={onOpenSettings}
     />

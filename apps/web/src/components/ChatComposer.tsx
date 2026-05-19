@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,7 +17,8 @@ import {
 import { projectRawUrl, uploadProjectFiles, openFolderDialog } from "../providers/registry";
 import { patchProject } from "../state/projects";
 import { fetchMcpServers } from "../state/mcp";
-import type { McpServerConfig } from "../state/mcp";
+import type { McpServerConfig, McpTemplate } from "../state/mcp";
+import { listPlugins } from "../state/projects";
 import type {
   AppConfig,
   ChatAttachment,
@@ -29,16 +31,52 @@ import type {
   PromptTemplateSummary,
   SkillSummary,
 } from "../types";
-import type { ConnectorDetail, ResearchOptions } from '@open-design/contracts';
+import type {
+  ConnectorDetail,
+  InstalledPluginRecord,
+  PluginSourceKind,
+  ResearchOptions,
+} from '@open-design/contracts';
 import { buildVisualAnnotationAttachment } from '../comments';
 import { Icon } from "./Icon";
 import { FacetModeChip } from "./FacetModeChip";
 import type { FacetSelection } from "./FacetParametersPanel";
 import type { FacetMode } from "./FacetSetupPopover";
+import { PluginDetailsModal } from "./PluginDetailsModal";
+import { PluginsSection, type PluginsSectionHandle } from "./PluginsSection";
 import { BUILT_IN_PETS, CUSTOM_PET_ID, resolveActivePet } from "./pet/pets";
+import {
+  buildInlineMentionParts,
+  inlineMentionToken,
+  type InlineMentionEntity,
+} from '../utils/inlineMentions';
 import { ANNOTATION_EVENT, type AnnotationEventDetail } from "./PreviewDrawOverlay";
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
+
+type ToolsTab = 'plugins' | 'skills' | 'mcp' | 'import' | 'pet';
+
+type MentionTab = 'all' | 'plugins' | 'skills' | 'mcp' | 'files';
+
+const USER_PLUGIN_SOURCE_KINDS = new Set<PluginSourceKind>([
+  'user',
+  'project',
+  'marketplace',
+  'github',
+  'url',
+  'local',
+]);
+
+const COMPOSER_TEXTAREA_MIN_HEIGHT = 88;
+const COMPOSER_TEXTAREA_MAX_HEIGHT = 184;
+
+function composerTextareaMaxHeight(): number {
+  if (typeof window === 'undefined') return COMPOSER_TEXTAREA_MAX_HEIGHT;
+  return Math.max(
+    COMPOSER_TEXTAREA_MIN_HEIGHT,
+    Math.min(COMPOSER_TEXTAREA_MAX_HEIGHT, Math.round(window.innerHeight * 0.34)),
+  );
+}
 
 interface SlashCommand {
   id: string;
@@ -237,8 +275,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     // a shortcut to open the full Settings dialog. Replaces the previous
     // row of three standalone buttons (which overflowed in narrow chats).
     const [toolsOpen, setToolsOpen] = useState(false);
-    type ToolsTab = 'mcp' | 'import' | 'pet';
     const [toolsTab, setToolsTab] = useState<ToolsTab>('mcp');
+    const [composerScrollTop, setComposerScrollTop] = useState(0);
+    const [installedPlugins, setInstalledPlugins] = useState<InstalledPluginRecord[]>([]);
+    const [detailsRecord, setDetailsRecord] = useState<InstalledPluginRecord | null>(null);
+    const pluginsSectionRef = useRef<PluginsSectionHandle | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const toolsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -301,6 +342,85 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         cancelled = true;
       };
     }, []);
+
+    // Skills now come from the parent (App.tsx → ProjectView → ChatPane → ChatComposer)
+    // pre-filtered by enabled/disabled state. We no longer fetch a fresh list
+    // here to avoid showing skills the user has disabled via Settings.
+
+    // Lazy-fetch installed plugins once on mount; the tools-menu Plugins
+    // tab and the @-mention picker both consume this list.
+    useEffect(() => {
+      if (!projectId) return;
+      let cancelled = false;
+      void listPlugins().then((rows) => {
+        if (cancelled) return;
+        setInstalledPlugins(rows);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [projectId]);
+
+    // Composer-side plugin list: hide bundled atoms (pipeline-only). Keep
+    // the full installed list available even when the project was created
+    // from a pinned plugin, so users can switch or layer different plugin
+    // context from the tools menu and @ picker.
+    const pluginsForComposer = useMemo<InstalledPluginRecord[]>(() => {
+      const allowedKinds = new Set(['skill', 'scenario', 'bundle']);
+      return installedPlugins.filter((p) => {
+        const k = p.manifest?.od?.kind;
+        return !k || allowedKinds.has(k);
+      });
+    }, [installedPlugins]);
+
+    const enabledMcpServers = useMemo(
+      () => mcpServers.filter((s) => s.enabled),
+      [mcpServers],
+    );
+    const composerMentionEntities = useMemo(
+      () =>
+        buildComposerMentionEntities({
+          files: projectFiles,
+          mcpServers: enabledMcpServers,
+          plugins: pluginsForComposer,
+          skills,
+          staged,
+        }),
+      [enabledMcpServers, pluginsForComposer, projectFiles, skills, staged],
+    );
+    const composerMentionParts = useMemo(
+      () => buildInlineMentionParts(draft, composerMentionEntities),
+      [composerMentionEntities, draft],
+    );
+
+    function resizeTextarea() {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const maxHeight = composerTextareaMaxHeight();
+      ta.style.height = 'auto';
+      const nextHeight = Math.min(
+        Math.max(ta.scrollHeight, COMPOSER_TEXTAREA_MIN_HEIGHT),
+        maxHeight,
+      );
+      ta.style.height = `${nextHeight}px`;
+      ta.style.overflowY = ta.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    }
+
+    useLayoutEffect(() => {
+      resizeTextarea();
+    }, [draft, composerMentionParts, staged.length, stagedSkills.length]);
+
+    useEffect(() => {
+      function onResize() {
+        resizeTextarea();
+      }
+      window.addEventListener('resize', onResize);
+      return () => window.removeEventListener('resize', onResize);
+    }, []);
+
+    useEffect(() => {
+      setComposerScrollTop(textareaRef.current?.scrollTop ?? 0);
+    }, [composerMentionParts, draft]);
 
     // Resolve which tabs to surface in the consolidated tools popover.
     // We intentionally always render at least the Import tab, since it has
@@ -902,6 +1022,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     // ProjectFile.path is optional, so fall back to .name for the legacy
     // flat shape — both ChatComposer and the old code paths see the same
     // entries.
+    const mentionQuery = mention ? mention.q.toLowerCase() : '';
     const filteredFiles = mention
       ? projectFiles
           .filter((f) => f.type === undefined || f.type === "file")
@@ -911,28 +1032,45 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           })
           .slice(0, 12)
       : [];
-    // Skills appear in the same @-popover so the user has one entry point
-    // for everything they want to attach to a turn. Already-staged skills
-    // drop out of the suggestion list so the popover keeps moving forward.
-    const stagedSkillIds = useMemo(
-      () => new Set(stagedSkills.map((s) => s.id)),
-      [stagedSkills],
-    );
-    const filteredSkills = useMemo(() => {
-      if (!mention) return [] as SkillSummary[];
-      const q = mention.q.toLowerCase();
-      return skills
-        .filter((s) => !stagedSkillIds.has(s.id))
-        .filter((s) => {
-          if (!q) return true;
-          return (
-            s.id.toLowerCase().includes(q) ||
-            s.name.toLowerCase().includes(q) ||
-            s.description.toLowerCase().includes(q)
-          );
-        })
-        .slice(0, 8);
-    }, [mention, skills, stagedSkillIds]);
+    const filteredPlugins = mention
+      ? pluginsForComposer
+          .filter((p) => {
+            if (!mentionQuery) return true;
+            return (
+              p.title.toLowerCase().includes(mentionQuery) ||
+              p.id.toLowerCase().includes(mentionQuery) ||
+              (p.manifest?.description ?? '').toLowerCase().includes(mentionQuery) ||
+              (p.manifest?.tags ?? []).join(' ').toLowerCase().includes(mentionQuery)
+            );
+          })
+          .slice(0, 8)
+      : [];
+    const filteredMcpServers = mention
+      ? enabledMcpServers
+          .filter((s) => {
+            if (!mentionQuery) return true;
+            return [
+              s.id,
+              s.label ?? '',
+              s.transport,
+              s.url ?? '',
+              s.command ?? '',
+            ]
+              .join(' ')
+              .toLowerCase()
+              .includes(mentionQuery);
+          })
+          .slice(0, 8)
+      : [];
+    // Already-staged skills drop out of the suggestion list (carried over
+    // from main) so the @-popover keeps moving forward as the user picks.
+    const stagedSkillIds = new Set(stagedSkills.map((s) => s.id));
+    const filteredSkills = mention
+      ? skills
+          .filter((s) => !stagedSkillIds.has(s.id))
+          .filter((s) => skillMatchesQuery(s, mentionQuery))
+          .sort((a, b) => skillMentionRank(a, mentionQuery) - skillMentionRank(b, mentionQuery))
+      : [];
 
     return (
       <div
@@ -1281,6 +1419,16 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         </div>
         {uploadError ? <span className="composer-hint">{uploadError}</span> : null}
         <span className="composer-hint">{t('chat.composerHint')}</span>
+        {detailsRecord ? (
+          <PluginDetailsModal
+            record={detailsRecord}
+            onClose={() => setDetailsRecord(null)}
+            onUse={async (record) => {
+              await pluginsSectionRef.current?.applyById(record.id, record);
+              setDetailsRecord(null);
+            }}
+          />
+        ) : null}
       </div>
     );
   }
@@ -1502,6 +1650,241 @@ function ToolsMcpPanel({
       </button>
     </>
   );
+}
+
+function ToolsSkillsPanel({
+  skills,
+  currentSkillId,
+  onPick,
+}: {
+  skills: SkillSummary[];
+  currentSkillId: string | null;
+  onPick: (skill: SkillSummary) => void | Promise<void>;
+}) {
+  const [query, setQuery] = useState('');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const visibleSkills = useMemo(
+    () => skills.filter((s) => skillMatchesQuery(s, query)).slice(0, 24),
+    [skills, query],
+  );
+  return (
+    <>
+      <div className="composer-tools-filter">
+        <input
+          className="composer-tools-search"
+          value={query}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+          placeholder="Search skills…"
+          aria-label="Search skills"
+        />
+      </div>
+      {visibleSkills.length === 0 ? (
+        <div className="composer-tools-empty">
+          {skills.length === 0 ? 'No skills available yet.' : `No skills found for “${query}”.`}
+        </div>
+      ) : (
+        <div className="composer-tools-list">
+          {visibleSkills.map((skill) => {
+            const active = skill.id === currentSkillId;
+            return (
+              <button
+                key={skill.id}
+                type="button"
+                role="menuitem"
+                className={`composer-tools-row${active ? ' active' : ''}`}
+                onClick={async () => {
+                  setPendingId(skill.id);
+                  try {
+                    await onPick(skill);
+                  } finally {
+                    setPendingId(null);
+                  }
+                }}
+                disabled={pendingId !== null}
+                title={skill.description}
+              >
+                <Icon name={active ? 'check' : 'file'} size={12} />
+                <span className="composer-tools-row-body">
+                  <strong>{skill.name}</strong>
+                  <span className="composer-tools-row-meta">
+                    {skill.mode}
+                    {skill.surface ? ` · ${skill.surface}` : ''}
+                  </span>
+                </span>
+                {pendingId === skill.id ? (
+                  <span className="composer-tools-row-pending">Applying…</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function pluginMatchesQuery(plugin: InstalledPluginRecord, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    plugin.title,
+    plugin.id,
+    plugin.sourceKind,
+    plugin.source,
+    plugin.manifest?.description ?? '',
+    ...(plugin.manifest?.tags ?? []),
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
+function skillMatchesQuery(skill: SkillSummary, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    skill.id,
+    skill.name,
+    skill.description,
+    skill.mode,
+    skill.surface ?? '',
+    ...skill.triggers,
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
+function skillMentionRank(skill: SkillSummary, query: string): number {
+  const q = query.trim().toLowerCase();
+  if (!q) return 1;
+  const id = skill.id.toLowerCase();
+  const name = skill.name.toLowerCase();
+  if (id.startsWith(q) || name.startsWith(q)) return 0;
+  return 1;
+}
+
+function mcpServerMatchesQuery(server: McpServerConfig, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    server.id,
+    server.label ?? '',
+    server.transport,
+    server.url ?? '',
+    server.command ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
+function mcpTemplateMatchesQuery(tpl: McpTemplate, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    tpl.id,
+    tpl.label,
+    tpl.description,
+    tpl.transport,
+    tpl.category,
+    tpl.homepage ?? '',
+    tpl.example ?? '',
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
+function pluginSourceLabel(plugin: InstalledPluginRecord): string {
+  return plugin.sourceKind === 'bundled' ? 'Official' : 'My plugin';
+}
+
+function buildComposerMentionEntities({
+  files,
+  mcpServers,
+  plugins,
+  skills,
+  staged,
+}: {
+  files: ProjectFile[];
+  mcpServers: McpServerConfig[];
+  plugins: InstalledPluginRecord[];
+  skills: SkillSummary[];
+  staged: ChatAttachment[];
+}): InlineMentionEntity[] {
+  const entities: InlineMentionEntity[] = [];
+  for (const plugin of plugins) {
+    entities.push({
+      id: plugin.id,
+      kind: 'plugin',
+      label: plugin.title,
+      token: inlineMentionToken(plugin.title),
+      title: `Plugin: ${plugin.title}`,
+    });
+  }
+  for (const skill of skills) {
+    entities.push({
+      id: skill.id,
+      kind: 'skill',
+      label: skill.name,
+      token: inlineMentionToken(skill.name),
+      title: `Skill: ${skill.name}`,
+    });
+    if (skill.id !== skill.name) {
+      entities.push({
+        id: skill.id,
+        kind: 'skill',
+        label: skill.id,
+        token: inlineMentionToken(skill.id),
+        title: `Skill: ${skill.name}`,
+      });
+    }
+  }
+  for (const server of mcpServers) {
+    const label = server.label || server.id;
+    entities.push({
+      id: server.id,
+      kind: 'mcp',
+      label,
+      token: inlineMentionToken(label),
+      title: `MCP: ${label}`,
+    });
+    if (server.id !== label) {
+      entities.push({
+        id: server.id,
+        kind: 'mcp',
+        label: server.id,
+        token: inlineMentionToken(server.id),
+        title: `MCP: ${label}`,
+      });
+    }
+  }
+  const filePaths = new Set<string>();
+  for (const file of files) {
+    const path = file.path ?? file.name;
+    if (!path || filePaths.has(path)) continue;
+    filePaths.add(path);
+    entities.push({
+      id: path,
+      kind: 'file',
+      label: path,
+      token: inlineMentionToken(path),
+      title: `File: ${path}`,
+    });
+  }
+  for (const attachment of staged) {
+    if (!attachment.path || filePaths.has(attachment.path)) continue;
+    filePaths.add(attachment.path);
+    entities.push({
+      id: attachment.path,
+      kind: 'file',
+      label: attachment.path,
+      token: inlineMentionToken(attachment.path),
+      title: `File: ${attachment.path}`,
+    });
+  }
+  return entities;
 }
 
 function ToolsImportPanel({

@@ -18,7 +18,7 @@ import type {
   SkillSummary,
 } from '../types';
 import { Icon } from './Icon';
-import { NewProjectPanel, type CreateInput } from './NewProjectPanel';
+import { NewProjectPanel, type CreateInput, type CreateTab } from './NewProjectPanel';
 
 interface Props {
   open: boolean;
@@ -33,7 +33,7 @@ interface Props {
   loading?: boolean;
   onCreate: (input: CreateInput) => void;
   onImportClaudeDesign?: (file: File) => Promise<void> | void;
-  onImportFolder?: (baseDir: string) => Promise<boolean> | boolean;
+  onImportFolder?: (baseDir: string) => Promise<boolean> | boolean | Promise<void> | void;
   // Electron-only secure folder pick + import response (PR #974 trust
   // boundary). When the bridge exposes `pickAndImport`, NewProjectPanel
   // dispatches the import atomically and surfaces the resulting project
@@ -41,6 +41,7 @@ interface Props {
   onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
   onOpenConnectorsTab?: () => void;
   onClose: () => void;
+  initialTab?: CreateTab;
 }
 
 export function NewProjectModal({
@@ -60,6 +61,7 @@ export function NewProjectModal({
   onImportFolderResponse,
   onOpenConnectorsTab,
   onClose,
+  initialTab,
 }: Props) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
@@ -132,6 +134,7 @@ export function NewProjectModal({
             {...(onImportFolder ? { onImportFolder } : {})}
             {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
             {...(onOpenConnectorsTab ? { onOpenConnectorsTab } : {})}
+            {...(initialTab ? { initialTab } : {})}
           />
         </div>
       </div>

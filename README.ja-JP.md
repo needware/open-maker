@@ -1,9 +1,18 @@
-# Open Maker
+# Open Design
+
+> [!IMPORTANT]
+> ### 🔥 `0.8.0-preview` が公開されました。デザインの旧時代は、ここで終わります。
+>
+> オープンソースで agent-native な Claude Design / Figma の代替 —— 2 週間で 40k stars、ここまで来ました。**残りの道のりは、あなたと一緒に進みたい。**
+>
+> **`main` で高速イテレーション中** — 0.8.0 は Open Design の次のフェーズです。PR を投げ、突飛なアイデアを放り込み、バグを報告してください —— あなたが持ち込んだものが、このムーブメントの次の姿になります。
+>
+> → [**告知を読む · インストーラーを入手 · このムーブメントに参加**](https://github.com/nexu-io/open-design/discussions/1727) · 現在の 0.7 と並行してインストールできます。
 
 > **[Claude Design][cd] のオープンソース代替。** ローカルファースト、Vercel デプロイ可能、あらゆるレイヤーで BYOK（Bring Your Own Key） — `PATH` 上で自動検出される **16 種類の coding-agent CLI**（Claude Code, Codex, Devin for Terminal, Cursor Agent, Gemini CLI, OpenCode, Qwen, Qoder CLI, GitHub Copilot CLI, Hermes, Kimi, Pi, Kiro, Kilo, Mistral Vibe, DeepSeek TUI）がデザインエンジンとなり、**31 個の組み合わせ可能な Skill** と **72 種のブランドグレード Design System** で駆動されます。CLI が未インストールでも、OpenAI 互換の BYOK プロキシ `/api/proxy/stream` で同じループを spawn なしで実行できます。
 
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Open Maker — ノートパソコン上のエージェントとデザインする" width="100%" />
+  <img src="docs/assets/banner.png" alt="Open Design — ノートパソコン上のエージェントとデザインする" width="100%" />
 </p>
 
 <p align="center">
@@ -36,7 +45,7 @@
 
 Anthropic の [Claude Design][cd]（2026-04-17 リリース、Opus 4.7 搭載）は、LLM が文章を書くのをやめてデザイン成果物を直接出力し始めたらどうなるかを世に示しました。瞬く間にバズり — そして**クローズドソース**、有料限定、クラウド限定、Anthropic のモデルと Anthropic の Skill に縛られたままでした。checkout もセルフホストも Vercel デプロイも、エージェントの差し替えもできません。
 
-**Open Maker（OD）はそのオープンソース代替です。** 同じループ、同じ「artifact-first」のメンタルモデル、しかしロックインなし。私たちはエージェントを同梱しません — あなたのノートパソコンにある最強の coding agent がすでにインストール済みです。それを Skill 駆動のデザインワークフローに接続するのが私たちの仕事です。ローカルでは `pnpm tools-dev` で完結し、Web レイヤーは Vercel にデプロイ可能で、すべてのレイヤーが BYOK です。
+**Open Design（OD）はそのオープンソース代替です。** 同じループ、同じ「artifact-first」のメンタルモデル、しかしロックインなし。私たちはエージェントを同梱しません — あなたのノートパソコンにある最強の coding agent がすでにインストール済みです。それを Skill 駆動のデザインワークフローに接続するのが私たちの仕事です。ローカルでは `pnpm tools-dev` で完結し、Web レイヤーは Vercel にデプロイ可能で、すべてのレイヤーが BYOK です。
 
 「`雑誌風のシードラウンド pitch deck を作って`」と入力してください。モデルが最初の 1 ピクセルを描く前に、**初期化質問フォーム**がポップアップします。エージェントは 5 つの厳選されたビジュアルディレクションから 1 つを選びます。ライブの `TodoWrite` 計画カードが UI にストリーミングされます。Daemon がディスク上に実際のプロジェクトフォルダを構築し、seed テンプレート、レイアウトライブラリ、セルフチェック用チェックリストを配置します。エージェントはそれらを**pre-flight で強制的に**読み取り、自身の出力に対して**五次元評価**を実行し、数秒後に `<artifact>` を 1 つ出力してサンドボックス iframe にレンダリングします。
 
@@ -275,7 +284,7 @@ DISCOVERY ディレクティブ     （turn-1 フォーム、turn-2 ブランド
    │  /api/upload         /api/projects/:id/files…
    │  /artifacts (静的)   /frames (静的)
    │
-   │  オプション sidecar IPC：/tmp/open-maker/ipc/<ns>/<app>.sock
+   │  オプション sidecar IPC：/tmp/open-design/ipc/<ns>/<app>.sock
    │  （STATUS · EVAL · SCREENSHOT · CONSOLE · CLICK · SHUTDOWN）
    └─────────┬───────────────────────────┘
              │ spawn(cli, [...], { cwd: .od/projects/<id> })
@@ -303,7 +312,7 @@ DISCOVERY ディレクティブ     （turn-1 フォーム、turn-2 ブランド
 
 ### デスクトップアプリのダウンロード（ビルド不要）
 
-Open Maker を最速で試す方法は、ビルド済みのデスクトップアプリです — Node、pnpm、clone は不要：
+Open Design を最速で試す方法は、ビルド済みのデスクトップアプリです — Node、pnpm、clone は不要：
 
 - **[open-design.ai](https://open-design.ai/)** — 公式ダウンロードページ
 - **[GitHub リリース](https://github.com/nexu-io/open-design/releases)**
@@ -312,7 +321,7 @@ Open Maker を最速で試す方法は、ビルド済みのデスクトップア
 
 ```bash
 git clone https://github.com/nexu-io/open-design.git
-cd open-maker
+cd open-design
 corepack enable
 corepack pnpm --version   # 10.33.2 と表示されるはず
 pnpm install
@@ -357,7 +366,7 @@ Daemon はリポジトリルートに 1 つの隠しフォルダを管理しま�
 ## リポジトリ構成
 
 ```
-open-maker/
+open-design/
 ├── README.md                      ← 英語
 ├── README.zh-CN.md                ← 简体中文
 ├── README.ja-JP.md                ← 本ファイル
@@ -392,7 +401,7 @@ open-maker/
 │
 ├── packages/
 │   ├── contracts/                 ← web/daemon 共有アプリ contracts
-│   ├── sidecar-proto/             ← Open Maker sidecar プロトコル contract
+│   ├── sidecar-proto/             ← Open Design sidecar プロトコル contract
 │   ├── sidecar/                   ← 汎用 sidecar ランタイムプリミティブ
 │   └── platform/                  ← 汎用 process/platform プリミティブ
 │
@@ -539,7 +548,7 @@ OD はコードで止まりません。`<artifact>` の HTML を生み出すの�
 
 ### HyperFrames — HTML→MP4 モーショングラフィック（11 件のすぐ複製できるテンプレート）
 
-[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) は HeyGen がオープンソース化したエージェントネイティブな動画フレームワークです — あなた（あるいは agent）が HTML + CSS + GSAP を書くと、HyperFrames は headless Chrome + FFmpeg で確定的に MP4 にレンダリングします。Open Maker は HyperFrames を一級の動画モデル（`hyperframes-html`）として daemon dispatch に接続し、さらに `skills/hyperframes/` skill を同梱して timeline 規約・シーンタンスィション規則・オーディオリアクティブパターン・キャプション/TTS・カタログブロック（`npx hyperframes add <slug>`）を agent に教えます。
+[**`heygen-com/hyperframes`**](https://github.com/heygen-com/hyperframes) は HeyGen がオープンソース化したエージェントネイティブな動画フレームワークです — あなた（あるいは agent）が HTML + CSS + GSAP を書くと、HyperFrames は headless Chrome + FFmpeg で確定的に MP4 にレンダリングします。Open Design は HyperFrames を一級の動画モデル（`hyperframes-html`）として daemon dispatch に接続し、さらに `skills/hyperframes/` skill を同梱して timeline 規約・シーンタンスィション規則・オーディオリアクティブパターン・キャプション/TTS・カタログブロック（`npx hyperframes add <slug>`）を agent に教えます。
 
 11 件の HyperFrames prompt は [`prompt-templates/video/hyperframes-*.json`](prompt-templates/video/) に置かれ、それぞれ特定アーキタイプを生む具体的な brief です：
 
@@ -577,7 +586,7 @@ OD はコードで止まりません。`<artifact>` の HTML を生み出すの�
 - **ユーザー保存テンプレート。** レンダリング結果が気に入ったら、`POST /api/templates` で HTML + メタデータを SQLite `templates` テーブルにスナップショット。次のプロジェクトのピッカーに「あなたのテンプレート」行が追加されます — 同梱の 31 個と同じ選択画面で、ただしあなたのもの。
 - **タブ永続化。** 各プロジェクトは開いているファイルとアクティブタブを `tabs` テーブルに記録。翌日開いてもワークスペースは昨日の状態そのまま。
 - **Artifact lint API。** `POST /api/artifacts/lint` は生成された artifact に対して構造チェックを実行（`<artifact>` フレーミングの破損、必須副ファイルの欠落、古いパレットトークン）し、エージェントが次のターンで読み返せる findings を返します。五次元セルフ評価はこれを使ってスコアを vibes ではなくエビデンスに基づかせます。
-- **Sidecar プロトコル + デスクトップ自動化。** Daemon、web、desktop プロセスは型付き 5 フィールドスタンプ（`app · mode · namespace · ipc · source`）を持ち、`/tmp/open-maker/ipc/<namespace>/<app>.sock` に JSON-RPC IPC チャネルを公開。`tools-dev inspect desktop status \| eval \| screenshot` はこのチャネル上で動作するため、ヘッドレス E2E テストが実際の Electron シェルに対して、カスタムハーネスなしで実行可能（[`packages/sidecar-proto/`](packages/sidecar-proto/)、[`apps/desktop/src/main/`](apps/desktop/src/main/)）。
+- **Sidecar プロトコル + デスクトップ自動化。** Daemon、web、desktop プロセスは型付き 5 フィールドスタンプ（`app · mode · namespace · ipc · source`）を持ち、`/tmp/open-design/ipc/<namespace>/<app>.sock` に JSON-RPC IPC チャネルを公開。`tools-dev inspect desktop status \| eval \| screenshot` はこのチャネル上で動作するため、ヘッドレス E2E テストが実際の Electron シェルに対して、カスタムハーネスなしで実行可能（[`packages/sidecar-proto/`](packages/sidecar-proto/)、[`apps/desktop/src/main/`](apps/desktop/src/main/)）。
 - **Windows フレンドリーな spawn。** 長いプロンプトで `CreateProcess` の約 32 KB argv 上限に達する adapter（Codex、Gemini、OpenCode、Cursor Agent、Qwen、Qoder CLI、Pi）はすべて stdin 経由でプロンプトを渡します。Claude Code と Copilot は `-p` を維持。stdin でも溢れる場合、daemon は一時 prompt ファイルにフォールバック。
 - **ネームスペースごとのランタイムデータ分離。** `OD_DATA_DIR` + `--namespace` で完全に分離された `.od/` スタイルのディレクトリツリーを提供。Playwright、beta チャネル、本番プロジェクトが同一 SQLite ファイルを共有することはありません。
 
@@ -594,7 +603,7 @@ OD はコードで止まりません。`<artifact>` の HTML を生み出すの�
 
 ## 比較
 
-| 軸 | [Claude Design][cd]（Anthropic） | [Open CoDesign][ocod] | **Open Maker** |
+| 軸 | [Claude Design][cd]（Anthropic） | [Open CoDesign][ocod] | **Open Design** |
 |---|---|---|---|
 | ライセンス | クローズド | MIT | **Apache-2.0** |
 | 形態 | Web (claude.ai) | デスクトップ (Electron) | **Web アプリ + ローカル daemon** |
@@ -694,7 +703,7 @@ Daemon 起動時に `PATH` から自動検出。設定不要。ストリーミ�
 ## Star をお願いします
 
 <p align="center">
-  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Open Maker に Star を — github.com/nexu-io/open-design" width="100%" /></a>
+  <a href="https://github.com/nexu-io/open-design"><img src="docs/assets/star-us.png" alt="Open Design に Star を — github.com/nexu-io/open-design" width="100%" /></a>
 </p>
 
 30 分の時間を節約できたなら、★ をお願いします。Star は家賃を払いませんが、次のデザイナー、エージェント、コントリビューターに「この実験は注目する価値がある」と伝えます。1 クリック、3 秒、リアルなシグナル：[github.com/nexu-io/open-design](https://github.com/nexu-io/open-design)。
@@ -711,10 +720,10 @@ Issue、PR、新 Skill、新 Design System を歓迎します。最も効果の�
 
 ## コントリビューター
 
-コード、ドキュメント、フィードバック、新 Skill、新 Design System、あるいは鋭い Issue — あらゆる形で Open Maker を前進させてくださったすべての方に感謝します。すべての実質的なコントリビューションは大切であり、以下のウォールは最もシンプルな感謝の表明です。
+コード、ドキュメント、フィードバック、新 Skill、新 Design System、あるいは鋭い Issue — あらゆる形で Open Design を前進させてくださったすべての方に感謝します。すべての実質的なコントリビューションは大切であり、以下のウォールは最もシンプルな感謝の表明です。
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-16" alt="Open Maker コントリビューター" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&cache_bust=2026-05-18" alt="Open Design コントリビューター" />
 </a>
 
 初めての PR を送った方 — ようこそ。[`good-first-issue`/`help-wanted`](https://github.com/nexu-io/open-design/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22%2C%22help+wanted%22) ラベルがエントリポイントです。
@@ -722,7 +731,7 @@ Issue、PR、新 Skill、新 Design System を歓迎します。最も効果の�
 ## リポジトリ活動
 
 <picture>
-  <img alt="Open Maker リポジトリメトリクス" src="docs/assets/github-metrics.svg" />
+  <img alt="Open Design リポジトリメトリクス" src="docs/assets/github-metrics.svg" />
 </picture>
 
 上記の SVG は [`.github/workflows/metrics.yml`](.github/workflows/metrics.yml) が [`lowlighter/metrics`](https://github.com/lowlighter/metrics) を使って毎日自動再生成しています。すぐに更新したい場合は **Actions** タブから手動トリガーしてください。より充実したプラグイン（traffic、follow-up time など）を有効にするには、リポジトリシークレットに細粒度 PAT を `METRICS_TOKEN` として追加してください。
@@ -731,9 +740,9 @@ Issue、PR、新 Skill、新 Design System を歓迎します。最も効果の�
 
 <a href="https://star-history.com/#nexu-io/open-design&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-16" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-16" />
-    <img alt="Open Maker star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-16" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-05-18" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-18" />
+    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-05-18" />
   </picture>
 </a>
 

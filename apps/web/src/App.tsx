@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useAnalytics } from './analytics/provider';
 import { trackAppLaunch, trackProjectCreateResult } from './analytics/events';
 import { detectClientType, detectLaunchSource } from './analytics/identity';
@@ -7,15 +7,25 @@ import {
   fidelityToTracking,
 } from '@open-design/contracts/analytics';
 import { EntryView } from './components/EntryView';
-import { PetOverlay } from './components/pet/PetOverlay';
+import type { IntegrationTab } from './components/IntegrationsView';
+import { MarketplaceView } from './components/MarketplaceView';
+import { PluginDetailView } from './components/PluginDetailView';
+import type { CreateInput } from './components/NewProjectPanel';
+import { MemoryToast } from './components/MemoryToast';
+import { PetOverlay, type PetTaskCenter } from './components/pet/PetOverlay';
+import { buildPetTaskCenter } from './components/pet/taskCenter';
+import { WorkspaceTabsBar } from './components/WorkspaceTabsBar';
 import { migrateCustomPetAtlas } from './components/pet/pets';
 import { ProjectView } from './components/ProjectView';
+import {
+  DesignSystemCreationFlow,
+  DesignSystemDetailView,
+} from './components/DesignSystemFlow';
 import {
   SettingsDialog,
   type SettingsSection,
 } from './components/SettingsDialog';
 import { PrivacyConsentModal } from './components/PrivacyConsentModal';
-import { MemoryToast } from './components/MemoryToast';
 import {
   daemonIsLive,
   fetchAppVersionInfo,
@@ -25,6 +35,7 @@ import {
   fetchPromptTemplates,
   fetchSkills,
 } from './providers/registry';
+import { RUNS_CHANGED_EVENT, listProjectRuns } from './providers/daemon';
 import { navigate, useRoute } from './router';
 import {
   fetchDaemonConfig,
@@ -65,7 +76,6 @@ import {
   updateCurrentApiProtocolConfig,
 } from './components/SettingsDialog';
 import { uploadProjectFiles } from './providers/registry';
-import type { CreateInput } from './components/NewProjectPanel';
 import { useI18n } from './i18n';
 import { liveArtifactTabId } from './types';
 import type {
@@ -80,7 +90,6 @@ import type {
   PromptTemplateSummary,
   SkillSummary,
 } from './types';
-import type { IntegrationTab } from './components/IntegrationsView';
 
 export function shouldSyncMediaProvidersOnSave(
   mediaProviders: AppConfig['mediaProviders'],
@@ -159,11 +168,13 @@ export function resolveSettingsCloseConfig(
 
 export function App() {
   const { t } = useI18n();
+  const clientType = useMemo(() => detectClientType(), []);
   const [config, setConfig] = useState<AppConfig>(() => loadConfig());
   const configRef = useRef(config);
   configRef.current = config;
   const latestPersistedConfigRef = useRef(config);
   latestPersistedConfigRef.current = config;
+  const [integrationInitialTab, setIntegrationInitialTab] = useState<IntegrationTab>('mcp');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsWelcome, setSettingsWelcome] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('execution');
@@ -187,6 +198,11 @@ export function App() {
   // homepage list ("/Users/me/proj" → "~/proj"). Empty until the first
   // successful `/api/projects/recent` round-trip.
   const [recentHomeDir, setRecentHomeDir] = useState('');
+  const [petTaskCenter, setPetTaskCenter] = useState<PetTaskCenter>({
+    running: [],
+    queued: [],
+    recent: [],
+  });
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<
     PromptTemplateSummary[]
@@ -533,6 +549,11 @@ export function App() {
   const refreshProjects = useCallback(async () => {
     const list = await listProjects();
     setProjects(list);
+  }, []);
+
+  const refreshDesignSystems = useCallback(async () => {
+    const list = await fetchDesignSystems();
+    setDesignSystems(list);
   }, []);
 
   const refreshTemplates = useCallback(async () => {
@@ -950,6 +971,32 @@ export function App() {
     navigate({ kind: 'project', projectId: id, fileName: null });
   }, []);
 
+  useEffect(() => {
+    if (!config.pet?.enabled || !daemonLive) {
+      setPetTaskCenter({ running: [], queued: [], recent: [] });
+      return;
+    }
+
+    let cancelled = false;
+    const refresh = async () => {
+      const runs = await listProjectRuns();
+      if (cancelled) return;
+      setPetTaskCenter(buildPetTaskCenter(projects, runs));
+    };
+    const handleRunsChanged = () => {
+      void refresh();
+    };
+
+    void refresh();
+    window.addEventListener(RUNS_CHANGED_EVENT, handleRunsChanged);
+    const id = window.setInterval(refresh, 2000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(RUNS_CHANGED_EVENT, handleRunsChanged);
+      window.clearInterval(id);
+    };
+  }, [config.pet?.enabled, daemonLive, projects]);
+
   const handleOpenLiveArtifact = useCallback((projectId: string, artifactId: string) => {
     navigate({ kind: 'project', projectId, fileName: liveArtifactTabId(artifactId) });
   }, []);
@@ -1162,80 +1209,145 @@ export function App() {
     [designSystems, config.disabledDesignSystems],
   );
 
+  // Phase 2B / spec §11.6 — marketplace deep UI dispatch. The
+  // /marketplace and /marketplace/:id routes render outside the
+  // EntryView / ProjectView split so the discovery surface stays
+  // independent of any active project.
+  let appMain: ReactNode;
+  if (route.kind === 'marketplace') {
+    appMain = <MarketplaceView />;
+  } else if (route.kind === 'marketplace-detail') {
+    appMain = <PluginDetailView pluginId={route.pluginId} />;
+  } else if (route.kind === 'design-system-create') {
+    appMain = (
+      <DesignSystemCreationFlow
+        onBack={() => navigate({ kind: 'home', view: 'design-systems' })}
+        onCreated={(projectId, project) => {
+          if (project) {
+            setProjects((curr) => [
+              project,
+              ...curr.filter((p) => p.id !== project.id),
+            ]);
+          }
+          navigate({ kind: 'project', projectId, conversationId: null, fileName: null });
+        }}
+        onProjectPrepared={(project) => {
+          setProjects((curr) => [
+            project,
+            ...curr.filter((p) => p.id !== project.id),
+          ]);
+        }}
+        onSystemsRefresh={refreshDesignSystems}
+        config={config}
+        onOpenConnectorsTab={() => openSettings('composio')}
+      />
+    );
+  } else if (route.kind === 'design-system-detail') {
+    appMain = (
+      <DesignSystemDetailView
+        id={route.designSystemId}
+        selectedId={config.designSystemId}
+        config={config}
+        agents={agents}
+        onBack={() => navigate({ kind: 'home', view: 'design-systems' })}
+        onOpenProject={(projectId) => navigate({ kind: 'project', projectId, conversationId: null, fileName: null })}
+        onSetDefault={handleChangeDefaultDesignSystem}
+        onSystemsRefresh={refreshDesignSystems}
+        onProjectsRefresh={refreshProjects}
+      />
+    );
+  } else if (activeProject) {
+    appMain = (
+      <ProjectView
+        key={activeProject.id}
+        project={activeProject}
+        routeFileName={route.kind === 'project' ? route.fileName : null}
+        routeConversationId={route.kind === 'project' ? route.conversationId : null}
+        config={config}
+        agents={agents}
+        skills={enabledFunctionalSkills}
+        designTemplates={designTemplates}
+        designSystems={designSystems}
+        daemonLive={daemonLive}
+        onModeChange={handleModeChange}
+        onAgentChange={handleAgentChange}
+        onAgentModelChange={handleAgentModelChange}
+        onRefreshAgents={refreshAgents}
+        onOpenSettings={openSettings}
+        onOpenMcpSettings={openMcpSettings}
+        onAdoptPetInline={handleAdoptPet}
+        onTogglePet={handleTogglePet}
+        onOpenPetSettings={openPetSettings}
+        onBack={handleBack}
+        onClearPendingPrompt={handleClearPendingPrompt}
+        onTouchProject={handleTouchProject}
+        onProjectChange={handleProjectChange}
+        onProjectsRefresh={refreshProjects}
+      />
+    );
+  } else {
+    appMain = (
+      <EntryView
+        skills={enabledSkills}
+        designTemplates={enabledDesignTemplates}
+        designSystems={enabledDS}
+        projects={projects}
+        templates={templates}
+        onDeleteTemplate={handleDeleteTemplate}
+        promptTemplates={promptTemplates}
+        defaultDesignSystemId={config.designSystemId}
+        agents={agents}
+        config={config}
+        integrationInitialTab={integrationInitialTab}
+        composioConfigLoading={composioConfigLoading}
+        daemonLive={daemonLive}
+        onModeChange={handleModeChange}
+        onAgentChange={handleAgentChange}
+        onAgentModelChange={handleAgentModelChange}
+        onApiProtocolChange={handleApiProtocolChange}
+        onApiModelChange={handleApiModelChange}
+        onThemeChange={handleThemeChange}
+        skillsLoading={skillsLoading}
+        designSystemsLoading={dsLoading}
+        projectsLoading={projectsLoading}
+        promptTemplatesLoading={promptTemplatesLoading}
+        onCreateProject={handleCreateProject}
+        onCreatePluginShareProject={handleCreatePluginShareProject}
+        onImportClaudeDesign={handleImportClaudeDesign}
+        onImportFolder={handleImportFolder}
+        onImportFolderResponse={handleImportFolderResponse}
+        onOpenProject={handleOpenProject}
+        onOpenLiveArtifact={handleOpenLiveArtifact}
+        onDeleteProject={handleDeleteProject}
+        onRenameProject={handleRenameProject}
+        onChangeDefaultDesignSystem={handleChangeDefaultDesignSystem}
+        onCreateDesignSystem={() => navigate({ kind: 'design-system-create' })}
+        onOpenDesignSystem={(id: string) => navigate({ kind: 'design-system-detail', designSystemId: id })}
+        onDesignSystemsRefresh={refreshDesignSystems}
+        onPersistComposioKey={handleConfigPersistComposioKey}
+        onOpenSettings={openSettings}
+      />
+    );
+  }
   return (
     <>
-      {activeProject ? (
-        <ProjectView
-          key={activeProject.id}
-          project={activeProject}
-          routeFileName={route.kind === 'project' ? route.fileName : null}
-          config={config}
-          agents={agents}
-          skills={enabledFunctionalSkills}
-          designTemplates={designTemplates}
-          designSystems={designSystems}
-          templates={templates}
-          promptTemplates={promptTemplates}
-          defaultDesignSystemId={config.designSystemId}
-          daemonLive={daemonLive}
-          onModeChange={handleModeChange}
-          onAgentChange={handleAgentChange}
-          onAgentModelChange={handleAgentModelChange}
-          onRefreshAgents={refreshAgents}
-          onOpenSettings={openSettings}
-          onOpenMcpSettings={openMcpSettings}
-          onAdoptPetInline={handleAdoptPet}
-          onTogglePet={handleTogglePet}
-          onOpenPetSettings={openPetSettings}
-          onBack={handleBack}
-          onClearPendingPrompt={handleClearPendingPrompt}
-          onTouchProject={handleTouchProject}
-          onProjectChange={handleProjectChange}
-          onProjectsRefresh={refreshProjects}
-        />
-      ) : (
-        <EntryView
-          skills={enabledSkills}
-          designTemplates={enabledDesignTemplates}
-          designSystems={enabledDS}
+      <div
+        className={`workspace-shell workspace-shell--${clientType}`}
+        data-client-type={clientType}
+      >
+        <WorkspaceTabsBar
+          route={route}
           projects={projects}
-          templates={templates}
-          onDeleteTemplate={handleDeleteTemplate}
-          promptTemplates={promptTemplates}
-          defaultDesignSystemId={config.designSystemId}
-          agents={agents}
-          config={config}
-          composioConfigLoading={composioConfigLoading}
-          daemonLive={daemonLive}
-          onModeChange={handleModeChange}
-          onAgentChange={handleAgentChange}
-          onAgentModelChange={handleAgentModelChange}
-          onApiProtocolChange={handleApiProtocolChange}
-          onApiModelChange={handleApiModelChange}
-          onThemeChange={handleThemeChange}
-          skillsLoading={skillsLoading}
-          designSystemsLoading={dsLoading}
-          projectsLoading={projectsLoading}
-          promptTemplatesLoading={promptTemplatesLoading}
-          onCreateProject={handleCreateProject}
-          onCreatePluginShareProject={handleCreatePluginShareProject}
-          onImportClaudeDesign={handleImportClaudeDesign}
-          onImportFolder={handleImportFolder}
-          onImportFolderResponse={handleImportFolderResponse}
+        />
+        <div className="workspace-shell__body">{appMain}</div>
+      </div>
+      {clientType === 'desktop' ? null : (
+        <PetOverlay
+          pet={config.pet?.enabled ? config.pet : undefined}
+          taskCenter={petTaskCenter}
           onOpenProject={handleOpenProject}
-          onOpenLiveArtifact={handleOpenLiveArtifact}
-          onDeleteProject={handleDeleteProject}
-          onRenameProject={handleRenameProject}
-          onChangeDefaultDesignSystem={handleChangeDefaultDesignSystem}
-          onPersistComposioKey={handleConfigPersistComposioKey}
-          onOpenSettings={openSettings}
         />
       )}
-      <PetOverlay
-        pet={config.pet?.enabled ? config.pet : undefined}
-        onTuck={handleTuckPet}
-        onOpenSettings={openPetSettings}
-      />
       {settingsOpen ? (
         <SettingsDialog
           initial={config}
@@ -1276,7 +1388,11 @@ export function App() {
           floating banner never intercepts modal interactions. */}
       {showPrivacyConsent ? (
         <PrivacyConsentModal
-          onShare={() => {
+          onAccept={() => {
+            // Default opt-in: clicking "I get it" enables the same telemetry
+            // surface the previous two-button "Share usage data" path opted
+            // into. The banner footer + PrivacySection give the user a
+            // one-click path to flip everything off later.
             const installationId = generateInstallationIdSafe();
             void handleConfigPersist({
               ...latestPersistedConfigRef.current,
@@ -1287,18 +1403,6 @@ export function App() {
             // Hand the foreground over to the welcome modal now that the
             // privacy decision is recorded — bootstrap deferred opening
             // it while consent was pending.
-            if (!latestPersistedConfigRef.current.onboardingCompleted) {
-              setSettingsWelcome(true);
-              setSettingsOpen(true);
-            }
-          }}
-          onDecline={() => {
-            void handleConfigPersist({
-              ...latestPersistedConfigRef.current,
-              installationId: null,
-              privacyDecisionAt: Date.now(),
-              telemetry: { metrics: false, content: false, artifactManifest: false },
-            });
             if (!latestPersistedConfigRef.current.onboardingCompleted) {
               setSettingsWelcome(true);
               setSettingsOpen(true);

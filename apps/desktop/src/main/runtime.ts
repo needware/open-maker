@@ -3,10 +3,11 @@ import { mkdir, writeFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { BrowserWindow, dialog, ipcMain, screen, shell } from "electron";
 import type { DesktopExportPdfInput, DesktopExportPdfResult } from "@open-design/sidecar-proto";
 
-import { exportPdfFromHtml, waitForPrintReadyHandshake } from "./pdf-export.js";
+import { createElectronPdfTarget, exportPdfFromHtml, savePrintReadyDocumentAsPdf } from "./pdf-export.js";
+import type { PrintReadyPdfOptions } from "./pdf-export.js";
 
 /**
  * Result of validating a candidate path before exposing it to a
@@ -204,6 +205,9 @@ export function signDesktopImportToken(
 const PENDING_POLL_MS = 120;
 const RUNNING_POLL_MS = 2000;
 const MAX_CONSOLE_ENTRIES = 200;
+const DESKTOP_PET_WINDOW_WIDTH = 360;
+const DESKTOP_PET_WINDOW_HEIGHT = 300;
+const DESKTOP_PET_WINDOW_MARGIN = 24;
 
 export type DesktopEvalInput = {
   expression: string;
@@ -623,6 +627,49 @@ function installWindowChromeCssHook(window: BrowserWindow): void {
   });
 }
 
+function desktopPetUrl(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  url.pathname = "/desktop-pet";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function createDesktopPetWindow(preloadPath: string): BrowserWindow {
+  const { workArea } = screen.getPrimaryDisplay();
+  const petWindow = new BrowserWindow({
+    width: DESKTOP_PET_WINDOW_WIDTH,
+    height: DESKTOP_PET_WINDOW_HEIGHT,
+    x: workArea.x + workArea.width - DESKTOP_PET_WINDOW_WIDTH - DESKTOP_PET_WINDOW_MARGIN,
+    y: workArea.y + workArea.height - DESKTOP_PET_WINDOW_HEIGHT - DESKTOP_PET_WINDOW_MARGIN,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    resizable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: preloadPath,
+      sandbox: true,
+    },
+  });
+  petWindow.setAlwaysOnTop(true, "floating");
+  petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  petWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isHttpUrl(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  petWindow.webContents.on("will-navigate", (event, url) => {
+    if (!url.includes("/desktop-pet")) event.preventDefault();
+  });
+  return petWindow;
+}
+
 function showWindowButtons(window: BrowserWindow): void {
   if (process.platform !== "darwin" || window.isDestroyed()) return;
   window.setWindowButtonVisibility(true);
@@ -714,6 +761,18 @@ function attachDownloadSaveAsDialog(window: BrowserWindow): void {
       ],
     });
   });
+}
+
+function parsePrintReadyPdfOptions(value: unknown): PrintReadyPdfOptions {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid print payload: expected options object");
+  }
+  const deck = (value as { deck?: unknown }).deck;
+  if (deck !== undefined && typeof deck !== "boolean") {
+    throw new Error("Invalid print payload: expected deck option to be boolean");
+  }
+  return deck === true ? { deck: true } : {};
 }
 
 export async function createDesktopRuntime(options: DesktopRuntimeOptions): Promise<DesktopRuntime> {
@@ -847,6 +906,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   });
 
   const consoleEntries: DesktopConsoleEntry[] = [];
+  const petWindow = createDesktopPetWindow(preloadPath);
   const window = new BrowserWindow({
     height: 900,
     // Below this size the project page's left/right split (chat
@@ -870,45 +930,40 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   showWindowButtons(window);
   attachDownloadSaveAsDialog(window);
 
+  ipcMain.removeAllListeners("desktop-pet:set-visible");
+  ipcMain.on("desktop-pet:set-visible", (event, visible: unknown) => {
+    if (petWindow.isDestroyed() || event.sender !== petWindow.webContents) return;
+    if (visible) petWindow.showInactive();
+    else petWindow.hide();
+  });
+
   ipcMain.removeHandler('od:print-pdf');
-  ipcMain.handle('od:print-pdf', async (_event, html: unknown, nonce: unknown): Promise<void> => {
+  ipcMain.handle('od:print-pdf', async (_event, html: unknown, nonce: unknown, options: unknown): Promise<void> => {
     if (typeof html !== 'string') {
       throw new Error('Invalid print payload: expected HTML string');
     }
     const printNonce = typeof nonce === 'string' ? nonce : '';
-
-    const printWindow = new BrowserWindow({
-      width: 800,
-      height: 600,
-      show: false,
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-
-    printWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    printWindow.webContents.on('will-navigate', (e) => e.preventDefault());
-
-    try {
-      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-      await waitForPrintReadyHandshake(printWindow.webContents, printNonce);
-      printWindow.show();
-
-      await new Promise<void>((resolve, reject) => {
-        printWindow.webContents.print({ printBackground: true }, (success: boolean, failureReason?: string) => {
-          if (success) resolve();
-          else if (failureReason === 'Print job canceled') resolve();
-          else reject(new Error(failureReason ?? 'Print failed'));
-        });
-      });
-    } finally {
-      if (!printWindow.isDestroyed()) printWindow.close();
+    const printOptions = parsePrintReadyPdfOptions(options);
+    // Issue #1774: the renderer's `printPdf()` bridge runs the direct
+    // Save-as-PDF flow (showSaveDialog -> printToPDF -> write), never
+    // `webContents.print()` — the printer-first OS dialog. The renderer
+    // (apps/web/src/runtime/exports.ts#exportAsPdf) only reacts to a
+    // rejection: it shows a "Print failed" alert. A resolved call —
+    // including a user-canceled Save dialog — is silent, matching the
+    // pre-#1774 behavior where canceling the OS dialog was a no-op.
+    const result = await savePrintReadyDocumentAsPdf(
+      html,
+      printNonce,
+      createElectronPdfTarget(),
+      printOptions,
+    );
+    if (!result.ok) {
+      throw new Error(result.error ?? 'PDF export failed');
     }
   });
 
   let currentUrl: string | null = null;
+  let currentPetUrl: string | null = null;
   let pendingUrl: string | null = null;
   let stopped = false;
   let timer: NodeJS.Timeout | null = null;
@@ -1006,6 +1061,11 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
         currentUrl = url;
         pendingUrl = null;
         showWindowButtons(window);
+        const nextPetUrl = desktopPetUrl(url);
+        if (!petWindow.isDestroyed() && nextPetUrl !== currentPetUrl) {
+          await petWindow.loadURL(nextPetUrl);
+          currentPetUrl = nextPetUrl;
+        }
       } else if (url == null) {
         pendingUrl = null;
       }
@@ -1039,6 +1099,8 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
         clearTimeout(timer);
         timer = null;
       }
+      ipcMain.removeAllListeners("desktop-pet:set-visible");
+      if (!petWindow.isDestroyed()) petWindow.close();
       if (!window.isDestroyed()) window.close();
     },
     console() {
