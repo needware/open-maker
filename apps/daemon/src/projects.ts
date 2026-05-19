@@ -78,11 +78,12 @@ export async function createScratchProjectDir(projectsRoot, prefix = 'scratch') 
  *
  * If `metadata.baseDir` is missing, this falls back to the legacy
  * `<projectsRoot>/<projectId>/` path AND logs a one-shot deprecation warning.
- * The DB startup gate in `db.ts::enforceProjectAsUnitInvariant` rejects any
- * persisted project row without baseDir, so this fallback is reachable only
- * from internal subsystems (live-artifacts, project-watchers, transcripts)
- * that haven't been threaded `metadata` through yet — those will be cleaned
- * up in slice 2.5; until then, the fallback keeps them functional.
+ * The DB startup heal in `db.ts::healLegacyProjectsMissingBaseDir` stamps
+ * baseDir on every persisted project row at boot, so this fallback is
+ * reachable only from internal subsystems (live-artifacts, project-watchers,
+ * transcripts) that haven't been threaded `metadata` through yet — those
+ * will be cleaned up in slice 2.5; until then, the fallback keeps them
+ * functional.
  */
 export function resolveProjectDir(projectsRoot, projectId, metadata?) {
   if (typeof metadata?.baseDir === 'string') {

@@ -10670,10 +10670,10 @@ export async function startServer({
           cwd = path.normalize(chatMeta.baseDir);
           existingProjectFiles = await listFiles(PROJECTS_DIR, projectId, { metadata: chatMeta });
         }
-        // Pre-RFC fallback (no baseDir) is gone; the DB startup gate in
-        // db.ts::enforceProjectAsUnitInvariant rejects rows without
-        // baseDir, so this branch is unreachable for any project that
-        // makes it through openDatabase().
+        // Pre-RFC fallback (no baseDir) is gone; the DB startup heal
+        // in db.ts::healLegacyProjectsMissingBaseDir stamps baseDir on
+        // every legacy row at boot, so this branch is unreachable for
+        // any project that makes it through openDatabase().
       } catch {
         cwd = null;
       }

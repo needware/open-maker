@@ -37,7 +37,11 @@ export function openDatabase(projectRoot: string, { dataDir }: { dataDir?: strin
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   migrate(db);
-  enforceProjectAsUnitInvariant(db, file);
+  // PROJECTS_DIR layout mirrors the rest of the daemon: per RFC the
+  // project root for files is `<dataDir>/projects`. The migration
+  // below needs to point legacy rows at that root.
+  const projectsDir = path.join(dir, 'projects');
+  healLegacyProjectsMissingBaseDir(db, projectsDir);
   dbInstance = db;
   dbFile = file;
   return db;
@@ -50,45 +54,78 @@ export function openDatabase(projectRoot: string, { dataDir }: { dataDir?: strin
  * baseDir whose files lived under `.od/projects/<uuid>/` — that model is
  * gone.
  *
- * The RFC's Phase 2 says "single landing, no coexistence; no migration
- * tooling". So if we find any legacy row, we refuse to start with a clear
- * message rather than silently masking the breakage. Operators with legacy
- * data should drop `.od/app.sqlite` and reopen their projects as folders.
+ * The original Phase 2 plan was "single landing, no coexistence; no migration
+ * tooling" — refuse to start when legacy rows exist and ask the operator to
+ * drop the SQLite database. In practice that meant any user who upgraded a
+ * daemon that had ever created a UUID-keyed project (e.g. the fork's
+ * pre-merge chat-first flow) lost their entire project list on first boot
+ * after the gate landed, which is a hostile upgrade story for downstream
+ * users who never opted into the RFC.
+ *
+ * Instead, run a one-shot in-place heal: for each row missing baseDir, stamp
+ * `metadata.baseDir` with either the existing `<projectsRoot>/<id>/`
+ * directory (preserves all generated artifacts) or, if that directory does
+ * not exist, a freshly-provisioned scratch directory under
+ * `<projectsRoot>/scratch/legacy-<id>/`. The row keeps its id and the rest
+ * of its metadata; only the baseDir field is added. Subsequent reads via
+ * resolveProjectDir now hit the user-owned baseDir branch and the legacy
+ * fallback warning goes silent.
  */
-function enforceProjectAsUnitInvariant(db: SqliteDb, file: string): void {
-  const stmt = db.prepare<unknown[], { id: string; metadata_json: string | null }>(
+function healLegacyProjectsMissingBaseDir(db: SqliteDb, projectsDir: string): void {
+  const select = db.prepare<unknown[], { id: string; metadata_json: string | null }>(
     'SELECT id, metadata_json FROM projects',
   );
-  const offenders: string[] = [];
-  for (const row of stmt.all()) {
-    let baseDir: unknown = null;
+  const update = db.prepare<[string, number, string]>(
+    'UPDATE projects SET metadata_json = ?, updated_at = ? WHERE id = ?',
+  );
+  const now = Date.now();
+  let healed = 0;
+  for (const row of select.all()) {
+    let parsed: Record<string, unknown> | null = null;
     if (typeof row.metadata_json === 'string' && row.metadata_json) {
       try {
-        const parsed = JSON.parse(row.metadata_json) as Record<string, unknown>;
-        baseDir = parsed?.baseDir;
+        const candidate = JSON.parse(row.metadata_json);
+        if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+          parsed = candidate as Record<string, unknown>;
+        }
       } catch {
-        // unparseable metadata counts as missing baseDir
+        // unparseable metadata is treated as empty — the heal below
+        // replaces it with `{ baseDir }` and the row becomes usable
+        // again.
       }
     }
-    if (typeof baseDir !== 'string' || !baseDir) {
-      offenders.push(row.id);
+    const existingBaseDir = parsed?.baseDir;
+    if (typeof existingBaseDir === 'string' && existingBaseDir) continue;
+
+    const legacyDir = path.join(projectsDir, row.id);
+    let baseDir: string;
+    if (fs.existsSync(legacyDir) && fs.statSync(legacyDir).isDirectory()) {
+      baseDir = legacyDir;
+    } else {
+      // No legacy files to preserve — provision a scratch directory so
+      // the row still satisfies the project-as-unit invariant. The
+      // `legacy-` prefix makes these easy to spot under
+      // `<projectsRoot>/scratch/` if the operator wants to clean them up
+      // later.
+      const scratchDir = path.join(
+        projectsDir,
+        'scratch',
+        `legacy-${row.id}-${randomUUID()}`,
+      );
+      fs.mkdirSync(scratchDir, { recursive: true });
+      baseDir = scratchDir;
     }
+    const nextMetadata = { ...(parsed ?? {}), baseDir };
+    update.run(JSON.stringify(nextMetadata), now, row.id);
+    healed += 1;
   }
-  if (offenders.length === 0) return;
-  const sample = offenders.slice(0, 5).join(', ');
-  const more = offenders.length > 5 ? ` … (+${offenders.length - 5} more)` : '';
-  throw new Error(
-    [
-      'Open Design refuses to start: legacy projects without metadata.baseDir found in ' + file + '.',
-      'After RFC project-as-unit, every project must be a directory on disk. Legacy UUID-keyed projects',
-      'are no longer supported. Affected project ids: ' + sample + more,
-      '',
-      'To recover: stop the daemon, delete the SQLite database (e.g. `rm ' + file + '*` to clear WAL/SHM),',
-      'then reopen each project as a folder via the new Open Folder UI. Your generated artifacts under',
-      '.od/projects/<uuid>/ are not migrated automatically; copy anything you want to keep into a real',
-      'user-owned folder before deleting.',
-    ].join('\n'),
-  );
+  if (healed > 0) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[od] db: healed ${healed} legacy project row(s) by stamping metadata.baseDir ` +
+      `(see <projectsRoot>/<id> or <projectsRoot>/scratch/legacy-*).`,
+    );
+  }
 }
 
 export function closeDatabase() {

@@ -186,12 +186,12 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
       // other create path (chat-first Home, plugin scenarios, template
       // kicks, scripted creation) provisions a scratch directory under
       // `<projectsRoot>/scratch/` and stamps that path as baseDir. This
-      // keeps the startup invariant `enforceProjectAsUnitInvariant`
-      // satisfied across daemon restarts (legacy rows missing baseDir
-      // would refuse to boot), and gives downstream code that resolves
-      // `metadata.baseDir` (generated artifacts, file listings, MCP
-      // exposure) a real, addressable directory instead of leaning on
-      // the soon-to-be-removed legacy `<projectsRoot>/<id>` fallback.
+      // keeps the project-as-unit invariant (every row owns a real
+      // on-disk directory) honored on the create path, and gives
+      // downstream code that resolves `metadata.baseDir` (generated
+      // artifacts, file listings, MCP exposure) a real, addressable
+      // directory instead of leaning on the soon-to-be-removed legacy
+      // `<projectsRoot>/<id>` fallback.
       const scratchPrefix = `create-${(baseMetadata?.kind ?? 'other')}`;
       const scratchBaseDir = await createScratchProjectDir(PROJECTS_DIR, scratchPrefix);
       const projectMetadata = {
