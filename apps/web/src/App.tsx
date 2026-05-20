@@ -953,6 +953,66 @@ export function App() {
     return true;
   }, []);
 
+  // "Set Up Workspace" — Cursor-style. The user picked N folders; we
+  // create exactly ONE project (the workspace), with the primary folder
+  // as the project's baseDir and the rest of the folders recorded as
+  // `metadata.workspaceRoots`. The agent session, conversation history,
+  // and chat all live on that single project — so the user gets one
+  // continuous agent context that knows about every selected root,
+  // instead of N separate projects with N separate conversations.
+  // Idempotent: re-opening the same workspace returns the same
+  // underlying project row (matched by the primary folder's realpath)
+  // and refreshes its workspace metadata in place.
+  const handleOpenWorkspaceProject = useCallback(
+    async (input: {
+      primaryPath: string;
+      workspaceName: string;
+      workspaceRoots: Array<{ path: string; name?: string }>;
+    }): Promise<boolean> => {
+      // Secondary roots (everything past the primary, which is already
+      // the project's baseDir) ride on `metadata.linkedDirs`. The
+      // daemon already wires linkedDirs into the agent runtime via
+      // `--add-dir` (see `apps/daemon/src/runtimes/defs/codex.ts`),
+      // so populating it here is what lets a single agent session
+      // actually read/write across every workspace root — i.e. the
+      // missing piece that turns the workspace from a UI label into a
+      // real multi-root agent context.
+      const secondaryRoots = input.workspaceRoots
+        .slice(1)
+        .map((r) => r.path)
+        .filter((p) => p && p !== input.primaryPath);
+      const result = await openProject({
+        path: input.primaryPath,
+        // The workspace name is also the project's display name —
+        // that's what shows up in the active-project label, the
+        // window title, and the Recents row. Without this the
+        // project would fall back to `basename(primaryPath)` and
+        // the workspace identity would only live in metadata.
+        name: input.workspaceName,
+        metadata: {
+          workspaceName: input.workspaceName,
+          workspaceRoots: input.workspaceRoots,
+          ...(secondaryRoots.length > 0 ? { linkedDirs: secondaryRoots } : {}),
+        },
+      });
+      if (!result) return false;
+      setProjects((curr) => [result.project, ...curr.filter((p) => p.id !== result.project.id)]);
+      void listRecentProjects()
+        .then((next) => {
+          setRecentProjects(next.entries);
+          setRecentHomeDir(next.homeDir);
+        })
+        .catch(() => {});
+      navigate({
+        kind: 'project',
+        projectId: result.project.id,
+        fileName: result.entryFile ?? null,
+      });
+      return true;
+    },
+    [],
+  );
+
   // PR #974: on Electron, the desktop main process owns the picker and
   // the import POST atomically (`pickAndImport`). The renderer never
   // sees the path or the HMAC token; it just receives the same
@@ -1318,6 +1378,7 @@ export function App() {
         onImportClaudeDesign={handleImportClaudeDesign}
         onImportFolder={handleImportFolder}
         onImportFolderResponse={handleImportFolderResponse}
+        onOpenWorkspaceProject={handleOpenWorkspaceProject}
         onOpenProject={handleOpenProject}
         onOpenLiveArtifact={handleOpenLiveArtifact}
         onDeleteProject={handleDeleteProject}

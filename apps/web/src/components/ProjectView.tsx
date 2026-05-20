@@ -442,6 +442,41 @@ function projectEventToAgentEvent(evt: ProjectEvent): LiveArtifactEventItem['eve
   };
 }
 
+// Visible "this is a workspace, not a plain folder" indicator. Shown
+// in the project header when `metadata.workspaceRoots` has more than
+// one entry — i.e. the project was created by "Set Up Workspace" and
+// aggregates several folder roots. The chip displays the folder count
+// and reveals every root in a hover popover, mirroring the popover
+// used in `ProjectSwitcherPanel` so the same visual language carries
+// from the switcher into the project view.
+function ProjectWorkspaceChip({
+  roots,
+}: {
+  roots: Array<{ path: string; name?: string }>;
+}) {
+  return (
+    <span
+      className="project-workspace-chip"
+      data-testid="project-workspace-chip"
+      role="group"
+      aria-label={`Workspace with ${roots.length} folders`}
+    >
+      <Icon name="folder" size={11} />
+      <span>{roots.length} folders</span>
+      <span
+        className="project-workspace-chip__popover"
+        role="tooltip"
+      >
+        <ul className="project-workspace-chip__popover-list">
+          {roots.map((r) => (
+            <li key={r.path}>{r.path}</li>
+          ))}
+        </ul>
+      </span>
+    </span>
+  );
+}
+
 export function ProjectView({
   project,
   routeFileName,
@@ -3375,6 +3410,10 @@ export function ProjectView({
             >
               {project.name}
             </span>
+            {Array.isArray(project.metadata?.workspaceRoots)
+              && project.metadata.workspaceRoots.length > 1 ? (
+              <ProjectWorkspaceChip roots={project.metadata.workspaceRoots} />
+            ) : null}
             <span className="meta" data-testid="project-meta">{projectMeta}</span>
             {(project.customInstructions ?? '').trim() ? (
               <button

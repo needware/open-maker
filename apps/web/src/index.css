@@ -1249,6 +1249,78 @@ code {
 
 /* Saved-state entry point: a persistent header chip that reveals the
    review panel so saved Project instructions stay discoverable (#1822). */
+/* Workspace chip in the project header — surfaces multi-root identity
+   so the user can see at a glance that the active project aggregates
+   several folders (set up via "Set Up Workspace"). Visual language
+   matches `.project-instructions-chip` (same shape/size) so the two
+   chips read as a single row of project metadata badges. */
+.project-workspace-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--text-muted);
+  background: var(--bg-hover, rgba(128, 128, 128, 0.1));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  flex-shrink: 0;
+  cursor: default;
+  transition: color 0.15s, border-color 0.15s;
+}
+.project-workspace-chip:hover {
+  color: var(--text);
+}
+.project-workspace-chip__popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  max-width: 420px;
+  padding: 8px 10px;
+  background: var(--surface-elevated, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 140ms;
+  pointer-events: none;
+  z-index: 30;
+}
+.project-workspace-chip:hover .project-workspace-chip__popover,
+.project-workspace-chip:focus-within .project-workspace-chip__popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 200ms;
+}
+.project-workspace-chip__popover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.project-workspace-chip__popover-list li {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .project-instructions-chip {
   display: inline-flex;
   align-items: center;
@@ -25123,4 +25195,206 @@ body.desktop-pet-shell .pet-task-item {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Workspace rows live inline in the Recents list — `--workspace` is
+   a flex wrapper containing the open button, optional delete button,
+   and the hover popover absolutely-positioned next to the row. The
+   row itself has a main click target (open) and an optional inline
+   delete affordance, so it cannot be a single <button>. */
+.project-switcher-row--workspace {
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  cursor: default;
+  background: transparent;
+  position: relative;
+}
+.project-switcher-row--workspace:hover:not([aria-disabled='true']) {
+  background: transparent;
+}
+/* Hover popover (Cursor-style): lists every folder path the workspace
+   aggregates. Hidden by default, slides in from the left edge of the
+   row's right side, and stays visible while the wrapper is hovered.
+   `pointer-events: none` so it never blocks the row's own click. */
+.project-switcher-row__popover {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  min-width: 240px;
+  max-width: 360px;
+  padding: 8px 10px;
+  background: var(--surface-elevated, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-4px);
+  transition: opacity 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 140ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 140ms;
+  pointer-events: none;
+  z-index: 10;
+}
+.project-switcher-row--workspace:hover .project-switcher-row__popover,
+.project-switcher-row--workspace:focus-within .project-switcher-row__popover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+  transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    visibility 200ms;
+}
+.project-switcher-row__popover-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, inherit);
+  margin-bottom: 6px;
+}
+.project-switcher-row__popover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.project-switcher-row__popover-list li {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-switcher-row__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font-size: 13px;
+  font-family: inherit;
+}
+.project-switcher-row__main:hover:not(:disabled) {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+.project-switcher-row__main:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.project-switcher-row__delete {
+  flex: 0 0 auto;
+  width: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.project-switcher-row__delete:hover:not(:disabled) {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+  color: var(--danger, #b91c1c);
+}
+.project-switcher-row__delete:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* Inline workspace-builder mode — same popover shell, replaces the
+   regular search/recents view when the user enters "Set Up
+   Workspace…". The popover gets a slightly taller cap so the
+   selectable list, footer actions, and hint fit without scrolling
+   the whole panel. */
+.project-switcher-panel--workspace {
+  max-height: min(78vh, 600px);
+}
+.project-switcher-panel__ws-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 8px;
+}
+.project-switcher-panel__back {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+.project-switcher-panel__back:hover:not(:disabled) {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
+  color: inherit;
+}
+.project-switcher-panel__back:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.project-switcher-panel__ws-name {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--surface-soft, transparent);
+  color: inherit;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.project-switcher-panel__ws-name:focus {
+  border-color: var(--accent, #4f46e5);
+}
+
+/* Multi-select row state — workspace-mode folder rows show ONLY a
+   checkmark on the right when selected. Hover/keyboard focus uses
+   the default `.project-switcher-row:hover` background, identical
+   to unselected rows, so the selected/unselected signal is the
+   checkmark alone (matches the Cursor "Set Up Workspace" affordance). */
+.project-switcher-row__check {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+}
+
+/* Workspace-mode footer holds the "Add Folder" row and the "Create"
+   row side-by-side with the validation hint. The Create row stacks
+   the CTA and the "Select at least 2 / N selected" status so they
+   align with the row baseline above. */
+.project-switcher-panel__create-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.project-switcher-panel__create-row .project-switcher-row {
+  flex: 0 0 auto;
+}
+.project-switcher-panel__hint {
+  flex: 1;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-faint);
+  padding-right: 8px;
+}
+.project-switcher-row--cta {
+  color: var(--accent, #4f46e5);
+}
+.project-switcher-row--cta:disabled {
+  color: var(--text-faint);
 }

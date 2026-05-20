@@ -50,6 +50,20 @@ export interface OpenProjectRequest {
   /** Absolute or workspace-relative directory path. The daemon resolves
    *  symlinks before storage. */
   path: string;
+  /** Optional display name; defaults to `basename(path)`. */
+  name?: string;
+  /** Optional skill/design-system pins applied to newly-created projects. */
+  skillId?: string | null;
+  designSystemId?: string | null;
+  /**
+   * Optional metadata patch. Cursor's "Set Up Workspace" sends
+   * `{ workspaceName, workspaceRoots }` so a single project can represent
+   * a multi-root workspace. The daemon merges this on top of the metadata
+   * it produces on creation, and on idempotent re-open it only touches the
+   * workspace-related fields if they're present in the patch (so opening
+   * the same folder as a plain project later doesn't strip workspace info).
+   */
+  metadata?: Partial<import('./projects').ProjectMetadata>;
 }
 
 export interface OpenProjectResponse {

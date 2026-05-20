@@ -109,6 +109,16 @@ export interface ProjectMetadata {
   // directly inside the user's folder. Stored as the realpath() result so
   // symlinks can't redirect writes after import time.
   baseDir?: string;
+  // Multi-root workspace (Cursor's "Set Up Workspace"): one project
+  // can be the home for several folder roots. `baseDir` is the
+  // primary root used by all current file-tool calls; the extra
+  // roots in `workspaceRoots` are recorded so future multi-root
+  // tool resolution and system-prompt context can light them up
+  // without a schema migration. When set, `workspaceName` is the
+  // user-chosen display name (distinct from the project's `name`,
+  // which defaults to the basename of the primary folder).
+  workspaceName?: string;
+  workspaceRoots?: Array<{ path: string; name?: string }>;
   // PR #974: marker stamped by the daemon's HMAC-gated import handler
   // when a folder import passed the desktop-main-process trust gate.
   // Only set on folder-imported projects (`baseDir` set) and only when

@@ -35,7 +35,14 @@ import { CenteredLoader } from './Loading';
 import { DesignsTab } from './DesignsTab';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import { ProjectSwitcherPanel } from './ProjectSwitcherPanel';
-import type { RecentProjectEntry } from '../state/projects';
+import { walkDirs, type RecentProjectEntry } from '../state/projects';
+import {
+  compareByRecency as compareWorkspaces,
+  deleteWorkspace,
+  listWorkspaces,
+  touchWorkspace,
+  type WorkspaceDef,
+} from '../state/workspaces';
 import { DesignSystemPreviewModal } from './DesignSystemPreviewModal';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
@@ -172,6 +179,17 @@ interface Props {
   // so the pickAndImport flow can short-circuit the modal's manual
   // baseDir input and return a ready-to-open project in one click.
   onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
+  // "Set Up Workspace" — Cursor-style multi-root open. Creates exactly
+  // one project (the workspace) whose primary folder is `primaryPath`
+  // and whose `metadata.workspaceRoots` records every selected folder.
+  // The agent session, conversation history, and chat all live on that
+  // single project, so one continuous agent context knows about all
+  // workspace roots — unlike `onImportFolder`, which is single-folder.
+  onOpenWorkspaceProject?: (input: {
+    primaryPath: string;
+    workspaceName: string;
+    workspaceRoots: Array<{ path: string; name?: string }>;
+  }) => Promise<boolean>;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
@@ -228,6 +246,7 @@ export function EntryShell({
   onImportClaudeDesign,
   onImportFolder,
   onImportFolderResponse,
+  onOpenWorkspaceProject,
   onOpenProject,
   onOpenLiveArtifact,
   onDeleteProject,
@@ -259,6 +278,70 @@ export function EntryShell({
   // Open Folder shortcut). Triggered by the EntryNavRail "Open
   // folder" button. Open from any entry view, not just home.
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  // Cursor-style multi-folder workspaces. The setup UI is rendered
+  // inline inside the switcher panel (workspace mode); this snapshot
+  // backs the "Workspaces" section listed above Recents.
+  const [workspaces, setWorkspaces] = useState<WorkspaceDef[]>([]);
+  // Recursive home-dir folder enumeration powers the workspace-mode
+  // candidate pool. Loaded lazily the first time the switcher opens
+  // (and again the next time the panel opens to pick up new dirs the
+  // user has created in the meantime). Falls back to an empty list
+  // when the daemon is unreachable.
+  const [homeFolders, setHomeFolders] = useState<string[]>([]);
+
+  function refreshWorkspaces() {
+    setWorkspaces(listWorkspaces().sort(compareWorkspaces));
+  }
+
+  useEffect(() => {
+    refreshWorkspaces();
+  }, []);
+
+  // Lazy-load the home-dir walk every time the switcher opens. The
+  // daemon endpoint is bounded (depth 4, ≤1000 entries) so this is a
+  // cheap call, and a per-open refresh keeps the candidate list in
+  // sync with directories the user may have created between opens
+  // without the cost of a filesystem watcher.
+  useEffect(() => {
+    if (!switcherOpen) return;
+    let cancelled = false;
+    void (async () => {
+      const result = await walkDirs();
+      if (!cancelled) setHomeFolders(result.paths);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [switcherOpen]);
+
+  // Broader folder pool used by the "Set Up Workspace" inline picker.
+  // Two sources merge in addition to whatever the panel already
+  // computes from `recentProjects`:
+  //   1. Imported projects with a folder `baseDir` — daemon-tracked
+  //      projects the user actively works in, regardless of whether
+  //      they're in the recent-N list.
+  //   2. The recursive walk of `~/` — every folder under home that
+  //      isn't filtered out by the daemon's noise blocklist.
+  // The panel dedupes against `recentProjects` paths so overlap is
+  // harmless.
+  const workspaceCandidatePaths = useMemo(() => {
+    const seen = new Set<string>();
+    const paths: string[] = [];
+    for (const p of projects) {
+      const baseDir = p.metadata?.baseDir;
+      if (typeof baseDir === 'string' && baseDir.length > 0 && !seen.has(baseDir)) {
+        seen.add(baseDir);
+        paths.push(baseDir);
+      }
+    }
+    for (const p of homeFolders) {
+      if (!seen.has(p)) {
+        seen.add(p);
+        paths.push(p);
+      }
+    }
+    return paths;
+  }, [projects, homeFolders]);
   // In-app folder-browser dialog used as the cross-platform fallback
   // when the Electron `pickAndImport` bridge isn't available (browser
   // dev, headless e2e, Linux without a native dialog). Talks to the
@@ -429,6 +512,50 @@ export function EntryShell({
     }
   }
 
+  // Open a saved workspace — Cursor-style. One workspace = one project,
+  // not N. The primary folder becomes the project's `baseDir`; every
+  // selected folder (including the primary) is recorded on the project's
+  // `metadata.workspaceRoots` so a single agent session knows about
+  // every root the user added to the workspace. The daemon de-dupes by
+  // the primary folder's realpath, so re-opening the same workspace
+  // returns the same project row and refreshes its workspace metadata
+  // in place. We fall back to `onImportFolder` only when the host
+  // didn't wire a workspace-aware handler — that path silently drops
+  // the extra roots, which is the safest degradation.
+  async function handleOpenWorkspace(workspace: WorkspaceDef): Promise<boolean> {
+    if (workspace.folders.length === 0) return false;
+    const primary = workspace.folders[0];
+    if (!primary) return false;
+    touchWorkspace(workspace.id);
+    refreshWorkspaces();
+    if (onOpenWorkspaceProject) {
+      try {
+        return await onOpenWorkspaceProject({
+          primaryPath: primary.path,
+          workspaceName: workspace.name,
+          workspaceRoots: workspace.folders.map((f) => ({
+            path: f.path,
+            ...(f.name ? { name: f.name } : {}),
+          })),
+        });
+      } catch {
+        return false;
+      }
+    }
+    if (!onImportFolder) return false;
+    try {
+      const result = await onImportFolder(primary.path);
+      return result !== false;
+    } catch {
+      return false;
+    }
+  }
+
+  function handleDeleteWorkspace(workspaceId: string) {
+    deleteWorkspace(workspaceId);
+    refreshWorkspaces();
+  }
+
 
   const avatarMenu = (
     <button
@@ -455,7 +582,6 @@ export function EntryShell({
         <main className="entry-main entry-main--scroll">
           <div className="entry-main__topbar">
             <div className="entry-main__topbar-chips">
-              <GithubStarBadge />
               <InlineModelSwitcher
                 config={config}
                 agents={agents}
@@ -636,6 +762,11 @@ export function EntryShell({
               setPickerInitial(recentHomeDir || undefined);
               setPickerOpen(true);
             }}
+            workspaces={workspaces}
+            onOpenWorkspace={handleOpenWorkspace}
+            onDeleteWorkspace={handleDeleteWorkspace}
+            onWorkspacesChanged={refreshWorkspaces}
+            workspaceCandidatePaths={workspaceCandidatePaths}
             onClose={() => setSwitcherOpen(false)}
           />
         </div>

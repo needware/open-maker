@@ -126,6 +126,44 @@ export async function listFiles(projectsRoot, projectId, opts = {}) {
   // the walk on large repos.
   const skipDirs = metadata?.baseDir ? SKIP_DIRS : undefined;
   await collectFiles(dir, '', out, skipDirs, dir);
+  // Multi-root workspace: also walk every `metadata.linkedDirs` entry
+  // (the secondary roots stamped by "Set Up Workspace"). Each linked
+  // root's files are namespaced under the folder's basename so they
+  // appear as `<rootName>/<relativePath>` in the Design Files panel —
+  // this both avoids collisions with primary-root paths and gives the
+  // user a visible marker for which workspace root a file came from.
+  // `linkedRoot: <absolutePath>` is stamped on every file so future
+  // operations can route reads/writes to the correct physical root
+  // without re-parsing the prefix.
+  if (Array.isArray(metadata?.linkedDirs) && metadata.linkedDirs.length > 0) {
+    const seenPrefixes = new Set();
+    for (const linkedDir of metadata.linkedDirs) {
+      if (typeof linkedDir !== 'string' || !linkedDir) continue;
+      let prefix = path.basename(linkedDir.replace(/[/\\]+$/, '')) || 'linked';
+      // Disambiguate duplicate basenames (e.g. two folders both named
+      // "src") so the panel doesn't show them as the same group.
+      let suffix = 1;
+      const baseName = prefix;
+      while (seenPrefixes.has(prefix)) {
+        suffix += 1;
+        prefix = `${baseName} (${suffix})`;
+      }
+      seenPrefixes.add(prefix);
+      const linkedOut = [];
+      try {
+        await collectFiles(linkedDir, '', linkedOut, SKIP_DIRS, linkedDir);
+      } catch {
+        // Linked dir might have moved or become unreadable between
+        // open and now. Drop it from the listing rather than failing
+        // the whole request — the primary root still surfaces.
+        continue;
+      }
+      for (const f of linkedOut) {
+        const namespaced = `${prefix}/${f.name}`;
+        out.push({ ...f, name: namespaced, path: namespaced, linkedRoot: linkedDir });
+      }
+    }
+  }
   // Newest first — matches the visual order users expect after generating.
   out.sort((a, b) => b.mtime - a.mtime);
   const since = Number(opts.since);

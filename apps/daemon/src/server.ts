@@ -3572,6 +3572,144 @@ export async function startServer({
     }
   });
 
+  // -------------------------------------------------------------------------
+  // GET /api/fs/walk-dirs — recursively enumerate directories under a root.
+  //
+  // Powers the "Set Up Workspace" inline picker so the candidate folder
+  // list isn't capped at the recent-N projects: every folder under `~/`
+  // (or the requested root) becomes a checkable candidate. Walk is BFS
+  // with sensible filters so we don't return tens of thousands of noise
+  // entries from a developer home dir:
+  //   - skip hidden dirs (names starting with `.`)
+  //   - skip well-known build/cache folders (`node_modules`, `dist`, …)
+  //   - skip macOS / Windows system shells at the top level (`Library`,
+  //     `Applications`, `AppData`, `.Trash`); deeper directories with
+  //     these names stay because they're rarely system folders below the
+  //     first level.
+  //   - do not recurse INTO symlinked directories (they're the typical
+  //     source of cycles); they still appear in the result list so the
+  //     user can pick a linked workspace if they want.
+  //   - cap depth (default 4, max 6) and total result count (default
+  //     1000, max 5000) to keep the request bounded on huge homedirs.
+  // -------------------------------------------------------------------------
+  app.get('/api/fs/walk-dirs', async (req, res) => {
+    try {
+      const homeDir = os.homedir();
+      const rootRaw = typeof req.query.root === 'string' ? req.query.root.trim() : '';
+      const depthRaw = Number(req.query.maxDepth);
+      const maxDepth = Number.isFinite(depthRaw)
+        ? Math.max(1, Math.min(6, Math.trunc(depthRaw)))
+        : 4;
+      const resultsRaw = Number(req.query.maxResults);
+      const maxResults = Number.isFinite(resultsRaw)
+        ? Math.max(50, Math.min(5000, Math.trunc(resultsRaw)))
+        : 1000;
+
+      let target: string;
+      if (!rootRaw || rootRaw === '~') {
+        target = homeDir;
+      } else if (rootRaw.startsWith('~/') || rootRaw.startsWith('~\\')) {
+        target = path.resolve(homeDir, rootRaw.slice(2));
+      } else if (path.isAbsolute(rootRaw)) {
+        target = path.resolve(rootRaw);
+      } else {
+        target = path.resolve(process.cwd(), rootRaw);
+      }
+
+      let resolvedRoot: string;
+      try {
+        resolvedRoot = await fs.promises.realpath(target);
+      } catch {
+        return sendApiError(res, 404, 'FS_NOT_FOUND', `root not found: ${target}`);
+      }
+
+      const SKIP_NAMES = new Set([
+        'node_modules',
+        '__pycache__',
+        '.git',
+        '.svn',
+        '.hg',
+        '.next',
+        '.cache',
+        '.turbo',
+        '.parcel-cache',
+        '.nuxt',
+        '.gradle',
+        '.idea',
+        '.vscode',
+        'dist',
+        'build',
+        'out',
+        'target',
+        'venv',
+        '.venv',
+        'env',
+        '.env',
+        '.tox',
+        'bin',
+        'obj',
+        '.DS_Store',
+      ]);
+      const TOP_SKIP = new Set([
+        'Library',
+        'Applications',
+        'Movies',
+        'Music',
+        'Pictures',
+        'Public',
+        'Sites',
+        '.Trash',
+        'AppData',
+      ]);
+
+      const paths: string[] = [];
+      const queue: { dir: string; depth: number; isTop: boolean }[] = [
+        { dir: resolvedRoot, depth: 0, isTop: true },
+      ];
+      let truncated = false;
+
+      while (queue.length > 0) {
+        if (paths.length >= maxResults) {
+          truncated = true;
+          break;
+        }
+        const next = queue.shift();
+        if (!next) break;
+        const { dir, depth, isTop } = next;
+        let dirents: fs.Dirent[];
+        try {
+          dirents = await fs.promises.readdir(dir, { withFileTypes: true });
+        } catch {
+          // EACCES / EPERM / ENOENT (race) — skip silently; walks of
+          // user-owned trees should not be derailed by one bad subdir.
+          continue;
+        }
+        for (const d of dirents) {
+          const isSymlink = d.isSymbolicLink();
+          const isDir = d.isDirectory();
+          if (!isDir && !isSymlink) continue;
+          if (d.name.startsWith('.')) continue;
+          if (SKIP_NAMES.has(d.name)) continue;
+          if (isTop && TOP_SKIP.has(d.name)) continue;
+          const child = path.join(dir, d.name);
+          paths.push(child);
+          if (paths.length >= maxResults) {
+            truncated = true;
+            break;
+          }
+          if (!isSymlink && depth + 1 < maxDepth) {
+            queue.push({ dir: child, depth: depth + 1, isTop: false });
+          }
+        }
+        if (truncated) break;
+      }
+
+      res.json({ root: resolvedRoot, home: homeDir, paths, truncated });
+    } catch (err) {
+      sendApiError(res, 500, 'INTERNAL_ERROR', String(err));
+    }
+  });
+
   // Open (or re-open) a folder as a project. The user picks a folder on
   // their disk and OD operates inside it directly: every write goes to
   // metadata.baseDir. No shadow tree — the user owns the workspace and is
@@ -3582,10 +3720,57 @@ export async function startServer({
   // existing row is returned and bumped to the top of the recent list.
   app.post('/api/projects/open', async (req, res) => {
     try {
-      const { path: rawPath, name, skillId, designSystemId } = req.body || {};
+      const { path: rawPath, name, skillId, designSystemId, metadata: rawMeta } = req.body || {};
       if (typeof rawPath !== 'string' || !rawPath.trim()) {
         return sendApiError(res, 400, 'BAD_REQUEST', 'path required');
       }
+      // Only workspace-related metadata fields are honored on /open. Everything
+      // else (baseDir, kind, importedFrom, ...) is derived from the path itself
+      // or is privileged (see /api/import/folder). We accept a narrow patch so
+      // a single client call can both open a project and stamp its multi-root
+      // workspace identity in one round-trip; on re-open, the same patch
+      // upgrades the existing row without overwriting unrelated fields.
+      //
+      // `linkedDirs` is the existing primitive that flows into `--add-dir` so
+      // the agent runtime can read/write across additional folders. We accept
+      // it here (validated through the same helper PATCH uses) so opening a
+      // workspace turns its secondary roots into real multi-root agent
+      // access in one round-trip — without it, the agent only sees baseDir
+      // and workspaceRoots is just a label.
+      const workspacePatch: {
+        workspaceName?: string;
+        workspaceRoots?: Array<{ path: string; name?: string }>;
+        linkedDirs?: string[];
+      } = {};
+      if (rawMeta && typeof rawMeta === 'object') {
+        if (typeof rawMeta.workspaceName === 'string' && rawMeta.workspaceName.trim()) {
+          workspacePatch.workspaceName = rawMeta.workspaceName.trim();
+        }
+        if (Array.isArray(rawMeta.workspaceRoots)) {
+          const roots: Array<{ path: string; name?: string }> = [];
+          for (const r of rawMeta.workspaceRoots) {
+            if (r && typeof r.path === 'string' && r.path.trim()) {
+              const entry: { path: string; name?: string } = { path: r.path.trim() };
+              if (typeof r.name === 'string' && r.name.trim()) entry.name = r.name.trim();
+              roots.push(entry);
+            }
+          }
+          if (roots.length > 0) workspacePatch.workspaceRoots = roots;
+        }
+        if (Array.isArray(rawMeta.linkedDirs)) {
+          const validated = validateLinkedDirs(rawMeta.linkedDirs);
+          if (validated.error) {
+            return sendApiError(res, 400, 'INVALID_LINKED_DIR', validated.error);
+          }
+          if (validated.dirs.length > 0) {
+            workspacePatch.linkedDirs = validated.dirs;
+          }
+        }
+      }
+      const hasWorkspacePatch =
+        workspacePatch.workspaceName !== undefined
+        || workspacePatch.workspaceRoots !== undefined
+        || workspacePatch.linkedDirs !== undefined;
       const trimmedInput = rawPath.trim();
       if (!path.isAbsolute(path.normalize(trimmedInput))) {
         return sendApiError(res, 400, 'BAD_REQUEST', 'path must be absolute');
@@ -3639,7 +3824,26 @@ export async function startServer({
         await addRecentProject(normalizedPath, now).catch(() => {
           // Best-effort: a failure to record "recent" must not fail the open.
         });
-        const body = { project: existing };
+        let projectToReturn = existing;
+        if (hasWorkspacePatch) {
+          const nextMeta = { ...(existing.metadata ?? {}), ...workspacePatch };
+          // When the caller is opening a workspace (workspaceName is set
+          // in the patch), the project's display name should also become
+          // the workspace name — that's what powers the active-project
+          // label, window title, and Recents row. We only touch `name`
+          // when the workspace patch supplies one, so a regular folder
+          // re-open doesn't disturb a user-customized project name.
+          const patch: { metadata: typeof nextMeta; name?: string } = { metadata: nextMeta };
+          if (typeof workspacePatch.workspaceName === 'string'
+              && workspacePatch.workspaceName !== existing.name) {
+            patch.name = workspacePatch.workspaceName;
+          }
+          // updateProject() replaces metadata wholesale; the merge above is
+          // what keeps baseDir, kind, importedFrom, etc. intact.
+          const updated = updateProject(db, existing.id, patch);
+          if (updated) projectToReturn = updated;
+        }
+        const body = { project: projectToReturn };
         return res.json(body);
       }
 
@@ -3661,6 +3865,7 @@ export async function startServer({
           baseDir: normalizedPath,
           importedFrom: 'folder',
           entryFile,
+          ...(hasWorkspacePatch ? workspacePatch : {}),
         },
         createdAt: now,
         updatedAt: now,

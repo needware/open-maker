@@ -107,6 +107,14 @@ interface Props {
   onImportClaudeDesign: (file: File) => Promise<void> | void;
   onImportFolder?: (baseDir: string) => Promise<boolean> | boolean | Promise<void> | void;
   onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
+  // Cursor-style "Set Up Workspace" open. One workspace → one project
+  // (the primary folder's project), with `metadata.workspaceRoots`
+  // recording every folder root. See `EntryShell`'s prop for details.
+  onOpenWorkspaceProject?: (input: {
+    primaryPath: string;
+    workspaceName: string;
+    workspaceRoots: Array<{ path: string; name?: string }>;
+  }) => Promise<boolean>;
   onOpenProject: (id: string) => void;
   onOpenLiveArtifact: (projectId: string, artifactId: string) => void;
   onDeleteProject: (id: string) => void;
@@ -272,6 +280,7 @@ export function EntryView({
   onImportClaudeDesign,
   onImportFolder,
   onImportFolderResponse,
+  onOpenWorkspaceProject,
   onOpenProject,
   onOpenLiveArtifact,
   onDeleteProject,
@@ -363,6 +372,7 @@ export function EntryView({
       onImportClaudeDesign={onImportClaudeDesign}
       {...(onImportFolder ? { onImportFolder } : {})}
       {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
+      {...(onOpenWorkspaceProject ? { onOpenWorkspaceProject } : {})}
       onOpenProject={onOpenProject}
       onOpenLiveArtifact={onOpenLiveArtifact}
       onDeleteProject={onDeleteProject}

@@ -127,6 +127,16 @@ type ProjectMetadata = {
     title?: string | null;
     description?: string | null;
   }> | null;
+  // Folder-import: absolute path the project's files live under. The
+  // prompt composer uses it to identify the workspace's primary root.
+  baseDir?: string | null;
+  // Multi-root workspace metadata. Mirrors the fields on
+  // `@open-design/contracts`' canonical `ProjectMetadata`. The
+  // composer renders a "Workspace roots" block from these so the
+  // agent has in-context evidence that secondary roots exist and
+  // are reachable via the runtime's `--add-dir` allow-list.
+  workspaceName?: string | null;
+  workspaceRoots?: Array<{ path: string; name?: string }> | null;
 };
 type ProjectTemplate = { name: string; description?: string | null; files: Array<{ name: string; content: string }> };
 type AudioVoiceOption = {
@@ -340,6 +350,31 @@ export function composeSystemPrompt({
     parts.push(
       `\n\n## Custom instructions (project-level)\n\nThe user has set the following instructions for this specific project. They take precedence over user-level custom instructions whenever both address the same topic (e.g. if user-level says "use spaces" but project-level says "use tabs", use tabs).\n\n${projectInstructions.trim()}`,
     );
+  }
+
+  // Multi-root workspace block — tells the agent that this project
+  // aggregates several folder roots (created via "Set Up Workspace")
+  // and lists each path with its role. Without this, even though
+  // `--add-dir` gives the runtime read/write access to the secondary
+  // roots, the model has no in-context evidence that they exist and
+  // tends to answer "file not found" instead of looking there. We
+  // only render when there's more than one root — a single-folder
+  // project is just `baseDir` and doesn't need the disclaimer.
+  if (Array.isArray(metadata?.workspaceRoots) && metadata.workspaceRoots.length > 1) {
+    const primary = metadata.baseDir;
+    const lines: string[] = [];
+    for (const r of metadata.workspaceRoots) {
+      if (!r?.path) continue;
+      const role = r.path === primary ? 'primary' : 'additional';
+      const label = r.name?.trim() || r.path.split('/').pop() || r.path;
+      lines.push(`- (${role}) \`${r.path}\`${label && label !== r.path ? ` — ${label}` : ''}`);
+    }
+    if (lines.length > 0) {
+      const wsName = metadata.workspaceName?.trim() || 'Untitled';
+      parts.push(
+        `\n\n## Workspace roots\n\nThis project is a multi-root workspace named "${wsName}". It aggregates the folder roots listed below. The runtime allow-lists every root via \`--add-dir\`, so you have read/write access to files in any of them — when the user references a file by name, search across all roots, not just the primary. The primary root is your working directory; resolve relative paths against it, but feel free to read/edit absolute paths inside any additional root.\n\n${lines.join('\n')}`,
+      );
+    }
   }
 
   if (activeDesignSystemBody && activeDesignSystemBody.length > 0) {

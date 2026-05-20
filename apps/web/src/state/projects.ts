@@ -69,6 +69,14 @@ export async function openProject(input: {
   name?: string;
   skillId?: string | null;
   designSystemId?: string | null;
+  /**
+   * Optional metadata patch. Currently the daemon only honors the
+   * workspace-related fields (`workspaceName`, `workspaceRoots`) here so
+   * that "Set Up Workspace" can stamp multi-root identity in the same
+   * round-trip that creates / re-opens the workspace's project. Other
+   * fields are ignored by the daemon.
+   */
+  metadata?: Partial<ProjectMetadata>;
 }): Promise<
   | { project: Project; conversationId?: string; entryFile?: string | null }
   | null
@@ -298,6 +306,47 @@ export async function listDir(
       error: json.error,
     },
   };
+}
+
+/**
+ * `GET /api/fs/walk-dirs` — recursively enumerate directories under a
+ * root (defaults to the daemon-reported home). Powers the "Set Up
+ * Workspace" inline picker so its candidate list shows every folder
+ * the user has under `~/`, not just the recent-N projects.
+ *
+ * The daemon caps depth (default 4) and total results (default 1000)
+ * and applies a noise filter (hidden dirs, `node_modules`, build/cache
+ * folders, top-level system shells like `Library` / `AppData`). Fails
+ * soft to `[]` so the UI degrades to the recents-only candidate set
+ * when the daemon is unreachable.
+ */
+export interface WalkDirsResult {
+  paths: string[];
+  truncated: boolean;
+}
+
+export async function walkDirs(input?: {
+  root?: string;
+  maxDepth?: number;
+  maxResults?: number;
+}): Promise<WalkDirsResult> {
+  try {
+    const params = new URLSearchParams();
+    if (input?.root) params.set('root', input.root);
+    if (input?.maxDepth != null) params.set('maxDepth', String(input.maxDepth));
+    if (input?.maxResults != null) params.set('maxResults', String(input.maxResults));
+    const qs = params.toString();
+    const resp = await fetch(`/api/fs/walk-dirs${qs ? `?${qs}` : ''}`);
+    if (!resp.ok) return { paths: [], truncated: false };
+    const json = (await resp.json()) as { paths?: unknown; truncated?: unknown };
+    const paths = Array.isArray(json.paths)
+      ? (json.paths.filter((p) => typeof p === 'string') as string[])
+      : [];
+    const truncated = json.truncated === true;
+    return { paths, truncated };
+  } catch {
+    return { paths: [], truncated: false };
+  }
 }
 
 // ---------- templates ----------
