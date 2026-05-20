@@ -37,6 +37,7 @@ import {
 import type {
   PluginShareAction,
   PluginShareProjectOutcome,
+  RecentProjectEntry,
 } from '../state/projects';
 
 interface Props {
@@ -50,6 +51,11 @@ interface Props {
   designTemplates: SkillSummary[];
   designSystems: DesignSystemSummary[];
   projects: Project[];
+  // Fork-only: recently opened workspace folders surfaced in the
+  // EntryNavRail "Open folder" popover. Forwarded through to
+  // EntryShell so the switcher can render the recents list.
+  recentProjects: RecentProjectEntry[];
+  recentHomeDir: string;
   templates: ProjectTemplate[];
   onDeleteTemplate: (id: string) => Promise<boolean>;
   promptTemplates: PromptTemplateSummary[];
@@ -240,6 +246,8 @@ export function EntryView({
   designTemplates,
   designSystems,
   projects,
+  recentProjects,
+  recentHomeDir,
   templates,
   onDeleteTemplate,
   promptTemplates,
@@ -329,6 +337,8 @@ export function EntryView({
       skills={skills}
       designSystems={designSystems}
       projects={projects}
+      recentProjects={recentProjects}
+      recentHomeDir={recentHomeDir}
       templates={templates}
       promptTemplates={promptTemplates}
       defaultDesignSystemId={defaultDesignSystemId}

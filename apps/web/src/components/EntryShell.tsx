@@ -33,6 +33,9 @@ import type {
 import { formatPickAndImportFailure } from '../utils/pickAndImportError';
 import { CenteredLoader } from './Loading';
 import { DesignsTab } from './DesignsTab';
+import { FolderPickerDialog } from './FolderPickerDialog';
+import { ProjectSwitcherPanel } from './ProjectSwitcherPanel';
+import type { RecentProjectEntry } from '../state/projects';
 import { DesignSystemPreviewModal } from './DesignSystemPreviewModal';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
@@ -112,6 +115,13 @@ interface Props {
   skills: SkillSummary[];
   designSystems: DesignSystemSummary[];
   projects: Project[];
+  // Fork-only: recently opened workspace folders surfaced in the
+  // EntryNavRail "Open folder" popover. Stays in sync with the
+  // homepage list; refreshed by App after every successful open.
+  recentProjects: RecentProjectEntry[];
+  // Daemon-reported home dir, used to render recent paths as `~/foo`
+  // and to expand `~/...` shortcuts back to absolute paths.
+  recentHomeDir: string;
   templates: ProjectTemplate[];
   promptTemplates: PromptTemplateSummary[];
   defaultDesignSystemId: string | null;
@@ -192,6 +202,8 @@ export function EntryShell({
   skills,
   designSystems,
   projects,
+  recentProjects,
+  recentHomeDir,
   templates,
   promptTemplates,
   defaultDesignSystemId,
@@ -243,6 +255,16 @@ export function EntryShell({
     details?: string;
   } | null>(null);
   const [chipImporting, setChipImporting] = useState(false);
+  // Project-switcher popover (recent folders + manual path input +
+  // Open Folder shortcut). Triggered by the EntryNavRail "Open
+  // folder" button. Open from any entry view, not just home.
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  // In-app folder-browser dialog used as the cross-platform fallback
+  // when the Electron `pickAndImport` bridge isn't available (browser
+  // dev, headless e2e, Linux without a native dialog). Talks to the
+  // daemon's `GET /api/fs/ls` to walk real OS paths.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerInitial, setPickerInitial] = useState<string | undefined>(undefined);
   const [integrationTab, setIntegrationTab] = useState<IntegrationTab>(integrationInitialTab);
   const [homePromptHandoff, setHomePromptHandoff] = useState<HomePromptHandoff | null>(null);
   function changeView(next: EntryViewKind) {
@@ -350,18 +372,15 @@ export function EntryShell({
     });
   }
 
-  // Stage B of plugin-driven-flow-plan: the rail's "From folder" chip
-  // dispatcher. Prefers the Electron-native folder picker when
-  // available so a single click lands the user in an imported
-  // project. Browser-only shells fall back to the existing modal
-  // path so the user can paste a baseDir.
+  // Direct folder picker used by the HomeHero "From folder" chip.
+  // Prefers the Electron-native `pickAndImport` bridge (PR #974 trust
+  // boundary: renderer no longer picks folders directly; the bridge
+  // does it atomically and HMAC-gates the import) so a single click
+  // lands the user in an imported project. Browser-only shells fall
+  // back to the in-app `FolderPickerDialog`, which talks to the
+  // daemon's `/api/fs/ls` to walk real OS paths.
   async function handleChipFolderImport() {
     if (chipImporting) return;
-    // PR #974 trust boundary: the renderer cannot pick a folder directly
-    // anymore — the bridge exposes `pickAndImport` instead (atomic
-    // pick + HMAC-gated import). On the web (no electronAPI) or when
-    // the bridge is older, fall back to opening the New Project modal
-    // so the user can paste a baseDir manually.
     if (
       typeof window !== 'undefined' &&
       typeof window.electronAPI?.pickAndImport === 'function' &&
@@ -381,7 +400,33 @@ export function EntryShell({
       }
       return;
     }
-    openNewProject('prototype');
+    // Browser fallback — the in-app folder browser. Seed the initial
+    // directory with the daemon-reported home dir when known so the
+    // dialog opens somewhere familiar.
+    setPickerInitial(recentHomeDir || undefined);
+    setPickerOpen(true);
+  }
+
+  // EntryNavRail "Open folder" trigger. Opens the recent-projects
+  // popover so users can either pick a recent folder, paste a path,
+  // or escalate into the native/in-app picker via the panel's
+  // "Open Folder…" row.
+  function openProjectSwitcher() {
+    setSwitcherOpen(true);
+  }
+
+  // Forwarded to ProjectSwitcherPanel — called by the manual-path
+  // input and recent-row clicks. Wraps the parent `onImportFolder`
+  // contract so the panel can report busy/error state and close
+  // itself on success.
+  async function handleSwitcherImport(path: string): Promise<boolean> {
+    if (!onImportFolder) return false;
+    try {
+      const result = await onImportFolder(path);
+      return result !== false;
+    } catch {
+      return false;
+    }
   }
 
 
@@ -404,7 +449,7 @@ export function EntryShell({
           view={view}
           onViewChange={changeView}
           onNewProject={() => openNewProject()}
-          onOpenFolder={handleChipFolderImport}
+          onOpenFolder={openProjectSwitcher}
           openingFolder={chipImporting}
         />
         <main className="entry-main entry-main--scroll">
@@ -567,6 +612,43 @@ export function EntryShell({
           onDismiss={() => setFolderImportError(null)}
         />
       ) : null}
+      {switcherOpen && onImportFolder ? (
+        <div
+          className="project-switcher-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('entry.navOpenFolder')}
+          onMouseDown={(e) => {
+            // Click on the dim backdrop (not the panel) closes the popover.
+            if (e.target === e.currentTarget) setSwitcherOpen(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setSwitcherOpen(false);
+          }}
+        >
+          <ProjectSwitcherPanel
+            recentProjects={recentProjects}
+            homeDir={recentHomeDir}
+            onImportFolder={handleSwitcherImport}
+            {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
+            onOpenPicker={() => {
+              setSwitcherOpen(false);
+              setPickerInitial(recentHomeDir || undefined);
+              setPickerOpen(true);
+            }}
+            onClose={() => setSwitcherOpen(false)}
+          />
+        </div>
+      ) : null}
+      <FolderPickerDialog
+        open={pickerOpen}
+        {...(pickerInitial !== undefined ? { initialPath: pickerInitial } : {})}
+        onClose={() => setPickerOpen(false)}
+        onOpen={(path) => {
+          setPickerOpen(false);
+          if (onImportFolder) void onImportFolder(path);
+        }}
+      />
     </div>
   );
 }

@@ -1292,6 +1292,8 @@ export function App() {
         designTemplates={enabledDesignTemplates}
         designSystems={enabledDS}
         projects={projects}
+        recentProjects={recentProjects}
+        recentHomeDir={recentHomeDir}
         templates={templates}
         onDeleteTemplate={handleDeleteTemplate}
         promptTemplates={promptTemplates}
