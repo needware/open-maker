@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react';
 import { useAnalytics } from '../analytics/provider';
 import { trackChatPanelClick } from '../analytics/events';
 import { useT } from '../i18n';
@@ -15,7 +15,24 @@ import {
 } from '../design-system-auto-prompt';
 import { latestTodoWriteInputForPinnedCard } from '../runtime/todos';
 import { TodoCard } from './ToolCard';
-import type { AppConfig, ChatAttachment, ChatCommentAttachment, ChatMessage, ChatMessageFeedbackChange, Conversation, PreviewComment, ProjectFile, ProjectMetadata, SkillSummary } from '../types';
+import type {
+  AppConfig,
+  ChatAttachment,
+  ChatCommentAttachment,
+  ChatMessage,
+  ChatMessageFeedbackChange,
+  Conversation,
+  DesignSystemSummary,
+  MediaProviderCredentials,
+  PreviewComment,
+  ProjectFile,
+  ProjectMetadata,
+  ProjectTemplate,
+  PromptTemplateSummary,
+  SkillSummary,
+} from '../types';
+import type { FacetSelection } from './FacetParametersPanel';
+import type { FacetMode } from './FacetSetupPopover';
 import { dayKey, dayLabel, exactDateTime, messageTime, relativeTimeLong } from '../utils/chatTime';
 import { commentsToAttachments, simplePositionLabel } from '../comments';
 import { AssistantMessage } from './AssistantMessage';
@@ -297,6 +314,24 @@ interface Props {
   byokApiProtocol?: AppConfig['apiProtocol'];
   byokImageModel?: string;
   onChangeByokImageModel?: (model: string) => void;
+  // Facet creation chip wiring. Passed through to ChatComposer so the
+  // user can pick "what to create" (prototype/deck/template/…) without
+  // leaving the chat surface. ProjectView owns derivation + persistence.
+  facetMode?: FacetMode;
+  facetSkillId?: string | null;
+  facetDesignSystemId?: string | null;
+  facetMetadata?: ProjectMetadata;
+  designSystems?: DesignSystemSummary[];
+  defaultDesignSystemId?: string | null;
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  mediaProviders?: Record<string, MediaProviderCredentials>;
+  onOpenConnectorsTab?: () => void;
+  onFacetChange?: (next: FacetSelection) => void;
+  // Exposes the inner composer's `focus()` / `setDraft()` to the parent
+  // so non-composer surfaces (e.g. WorkspaceFacetHero) can drop the
+  // user back into the textarea after picking a mode.
+  composerHandleRef?: RefObject<ChatComposerHandle | null>;
 }
 
 type Tab = 'chat' | 'comments';
@@ -351,12 +386,36 @@ export function ChatPane({
   byokApiProtocol,
   byokImageModel,
   onChangeByokImageModel,
+  facetMode,
+  facetSkillId = null,
+  facetDesignSystemId = null,
+  facetMetadata,
+  designSystems,
+  defaultDesignSystemId,
+  templates,
+  promptTemplates,
+  mediaProviders,
+  onOpenConnectorsTab,
+  onFacetChange,
+  composerHandleRef,
 }: Props) {
   const t = useT();
   const analytics = useAnalytics();
   const logRef = useRef<HTMLDivElement | null>(null);
   const historyWrapRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<ChatComposerHandle | null>(null);
+  // Mirror the inner composer handle out to the parent's ref (when
+  // provided). We do it via useImperativeHandle on a synthetic object
+  // because composerRef itself only fills in once the inner forwardRef
+  // has mounted.
+  useImperativeHandle(
+    composerHandleRef ?? { current: null },
+    () => ({
+      setDraft: (text: string) => composerRef.current?.setDraft(text),
+      focus: () => composerRef.current?.focus(),
+    }),
+    [composerHandleRef],
+  );
   const didInitialScrollRef = useRef(false);
   // Tracks whether the user is glued close enough to the bottom that
   // streamed content should auto-follow. Distinct from the jump-button
@@ -952,6 +1011,17 @@ export function ChatPane({
             currentSkillId={currentSkillId}
             onProjectSkillChange={onProjectSkillChange}
             pinnedPluginId={activePluginSnapshot?.pluginId ?? null}
+            facetMode={facetMode}
+            facetSkillId={facetSkillId}
+            facetDesignSystemId={facetDesignSystemId}
+            facetMetadata={facetMetadata}
+            designSystems={designSystems}
+            defaultDesignSystemId={defaultDesignSystemId}
+            templates={templates}
+            promptTemplates={promptTemplates}
+            mediaProviders={mediaProviders}
+            onOpenConnectorsTab={onOpenConnectorsTab}
+            onFacetChange={onFacetChange}
           />
         </>
       ) : null}

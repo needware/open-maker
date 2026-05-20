@@ -105,6 +105,7 @@ import type {
   PreviewCommentTarget,
   ProjectFile,
   ProjectTemplate,
+  PromptTemplateSummary,
   LiveArtifactEventItem,
   LiveArtifactSummary,
   SkillSummary,
@@ -119,12 +120,14 @@ import {
 import { AppChromeHeader } from './AppChromeHeader';
 import { AvatarMenu } from './AvatarMenu';
 import { ChatPane } from './ChatPane';
-import type { ChatSendMeta } from './ChatComposer';
+import type { ChatComposerHandle, ChatSendMeta } from './ChatComposer';
 import {
   CritiqueTheaterMount,
   useCritiqueTheaterEnabled,
 } from './Theater';
 import { decideAutoOpenAfterWrite } from './auto-open-file';
+import { mergeFacetMetadata, type FacetSelection } from './FacetParametersPanel';
+import { FACET_MODES, type FacetMode } from './FacetSetupPopover';
 import { FileWorkspace } from './FileWorkspace';
 import { Icon } from './Icon';
 import {
@@ -171,6 +174,12 @@ interface Props {
   // mode even when the user later disables the template in Settings.
   designTemplates: SkillSummary[];
   designSystems: DesignSystemSummary[];
+  // Optional context passed straight through to the chat composer's
+  // FacetModeChip so the popover can offer templates / prompt templates
+  // / default design system without ProjectView owning the wiring.
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  defaultDesignSystemId?: string | null;
   daemonLive: boolean;
   onModeChange: (mode: AppConfig['mode']) => void;
   onAgentChange: (id: string) => void;
@@ -479,6 +488,9 @@ export function ProjectView({
   skills,
   designTemplates,
   designSystems,
+  templates = [],
+  promptTemplates = [],
+  defaultDesignSystemId = null,
   daemonLive,
   onModeChange,
   onAgentChange,
@@ -3067,6 +3079,44 @@ export function ProjectView({
         designTemplates.find((s) => s.id === project.skillId))?.mode === 'deck',
     [skills, designTemplates, project.skillId],
   );
+
+  // The composer's FacetModeChip needs a handle so callers can refocus
+  // the textarea after picking a mode.
+  const composerHandleRef = useRef<ChatComposerHandle | null>(null);
+
+  // Derive the chip's "current mode" from the persisted skillId. When
+  // there's no skill chosen yet (fresh project), default to 'prototype'
+  // — the most common starting point and the leftmost tab in the
+  // popover. Users can pick a different mode from the chip or hero.
+  const facetMode: FacetMode = useMemo(() => {
+    const skill = skills.find((s) => s.id === project.skillId);
+    if (skill && FACET_MODES.includes(skill.mode)) return skill.mode;
+    return 'prototype';
+  }, [skills, project.skillId]);
+
+  const handleFacetChange = useCallback(
+    (next: FacetSelection) => {
+      // Carry forward system-owned metadata fields the panel does not
+      // touch (baseDir, importedFrom, linkedDirs, …) while letting the
+      // panel fully replace its own slice of fields.
+      const mergedMetadata = mergeFacetMetadata(project.metadata, next.metadata);
+      const updated: Project = {
+        ...project,
+        skillId: next.skillId,
+        designSystemId: next.designSystemId,
+        metadata: mergedMetadata,
+        updatedAt: Date.now(),
+      };
+      onProjectChange(updated);
+      void patchProject(project.id, {
+        skillId: next.skillId,
+        designSystemId: next.designSystemId,
+        metadata: mergedMetadata,
+      });
+    },
+    [project, onProjectChange],
+  );
+
   const chatResizeLabel = t('project.resizeChatPanel');
   const workspacePanelTrack =
     workspacePanelMinWidth === 0
@@ -3738,6 +3788,18 @@ export function ProjectView({
               }}
               activePluginSnapshot={activePluginSnapshot}
               onCollapse={() => setWorkspaceFocused(true)}
+              facetMode={facetMode}
+              facetSkillId={project.skillId ?? null}
+              facetDesignSystemId={project.designSystemId ?? null}
+              facetMetadata={project.metadata}
+              designSystems={designSystems}
+              defaultDesignSystemId={defaultDesignSystemId}
+              templates={templates}
+              promptTemplates={promptTemplates}
+              mediaProviders={config.mediaProviders}
+              onOpenConnectorsTab={onOpenSettings}
+              onFacetChange={handleFacetChange}
+              composerHandleRef={composerHandleRef}
             />
           ) : (
             <div className="pane" data-testid="chat-pane-loading">

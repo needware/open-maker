@@ -19,7 +19,18 @@ import { patchProject } from "../state/projects";
 import { fetchMcpServers } from "../state/mcp";
 import type { McpServerConfig, McpTemplate } from "../state/mcp";
 import { listPlugins } from "../state/projects";
-import type { AppConfig, ChatAttachment, ChatCommentAttachment, ProjectFile, ProjectMetadata, SkillSummary } from "../types";
+import type {
+  AppConfig,
+  ChatAttachment,
+  ChatCommentAttachment,
+  DesignSystemSummary,
+  MediaProviderCredentials,
+  ProjectFile,
+  ProjectMetadata,
+  ProjectTemplate,
+  PromptTemplateSummary,
+  SkillSummary,
+} from "../types";
 import type {
   ContextItem,
   ConnectorDetail,
@@ -30,6 +41,9 @@ import type {
 } from '@open-design/contracts';
 import { buildVisualAnnotationAttachment } from '../comments';
 import { Icon } from "./Icon";
+import { FacetModeChip } from "./FacetModeChip";
+import type { FacetSelection } from "./FacetParametersPanel";
+import type { FacetMode } from "./FacetSetupPopover";
 import { PluginDetailsModal } from "./PluginDetailsModal";
 import { PluginsSection, type PluginsSectionHandle } from "./PluginsSection";
 import { BUILT_IN_PETS, CUSTOM_PET_ID, resolveActivePet } from "./pet/pets";
@@ -145,6 +159,23 @@ interface Props {
   // ActivePluginChip on each user message (see UserMessage in
   // ChatPane). Pass `null` (or omit) to render the full rail.
   pinnedPluginId?: string | null;
+  // Facet creation chip wiring (RFC `project-as-unit`). When all four
+  // are provided the composer renders a FacetModeChip in its leading
+  // area; the chip drives "what to create" without the user leaving
+  // the chat surface. Optional so the composer still works in non-
+  // project contexts (e.g. routine quick-prompt) where there's no
+  // facet to bind to.
+  facetMode?: FacetMode;
+  facetSkillId?: string | null;
+  facetDesignSystemId?: string | null;
+  facetMetadata?: ProjectMetadata;
+  designSystems?: DesignSystemSummary[];
+  defaultDesignSystemId?: string | null;
+  templates?: ProjectTemplate[];
+  promptTemplates?: PromptTemplateSummary[];
+  mediaProviders?: Record<string, MediaProviderCredentials>;
+  onOpenConnectorsTab?: () => void;
+  onFacetChange?: (next: FacetSelection) => void;
 }
 
 // Imperative handle so ancestors (e.g. example chips in ChatPane) can
@@ -202,6 +233,17 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       currentSkillId = null,
       onProjectSkillChange,
       pinnedPluginId = null,
+      facetMode,
+      facetSkillId = null,
+      facetDesignSystemId = null,
+      facetMetadata,
+      designSystems,
+      defaultDesignSystemId,
+      templates,
+      promptTemplates,
+      mediaProviders,
+      onOpenConnectorsTab,
+      onFacetChange,
     },
     ref
   ) {
@@ -1381,6 +1423,24 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 e.target.value = '';
               }}
             />
+            {facetMode && onFacetChange ? (
+              <FacetModeChip
+                currentMode={facetMode}
+                currentSkillId={facetSkillId}
+                currentDesignSystemId={facetDesignSystemId}
+                currentMetadata={facetMetadata}
+                skills={skills}
+                designSystems={designSystems ?? []}
+                defaultDesignSystemId={defaultDesignSystemId ?? null}
+                templates={templates ?? []}
+                promptTemplates={promptTemplates ?? []}
+                mediaProviders={mediaProviders}
+                connectors={connectors}
+                onOpenConnectorsTab={onOpenConnectorsTab}
+                onChange={onFacetChange}
+                disabled={streaming}
+              />
+            ) : null}
             <div className="composer-tools-wrap">
               <button
                 ref={toolsTriggerRef}
