@@ -20,6 +20,7 @@ import type {
   ChatSseStartPayload,
   DaemonAgentPayload,
   ResearchOptions,
+  RunContextSelection,
   SseErrorPayload,
 } from '@open-design/contracts';
 import type { StreamHandlers } from './anthropic';
@@ -179,6 +180,7 @@ export interface DaemonStreamOptions {
   model?: string | null;
   reasoning?: string | null;
   research?: ResearchOptions;
+  context?: RunContextSelection;
   initialLastEventId?: string | null;
   onRunCreated?: (runId: string) => void;
   onRunStatus?: (status: ChatRunStatus) => void;
@@ -233,6 +235,7 @@ export async function streamViaDaemon({
   model,
   reasoning,
   research,
+  context,
   initialLastEventId,
   onRunCreated,
   onRunStatus,
@@ -261,6 +264,7 @@ export async function streamViaDaemon({
     commentAttachments: commentAttachments ?? [],
     model: model ?? null,
     reasoning: reasoning ?? null,
+    ...(context ? { context } : {}),
     ...(research ? { research } : {}),
   };
   const body = JSON.stringify(request);
@@ -534,6 +538,7 @@ async function consumeDaemonRun({
         serverDeclaredSuccess = status.status === 'succeeded';
         onRunStatus?.(endStatus);
       } else {
+        onRunStatus?.('failed');
         handlers.onError(new Error('daemon stream disconnected before run completed'));
         return;
       }
