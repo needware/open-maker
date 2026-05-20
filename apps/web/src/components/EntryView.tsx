@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type {
   ConnectorDetail,
   ConnectorStatusResponse,
-  ImportFolderResponse,
 } from '@open-design/contracts';
+import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
 import {
   DEFAULT_AUDIO_MODEL,
   DEFAULT_IMAGE_MODEL,
@@ -76,6 +76,8 @@ interface Props {
   ) => void;
   onApiProtocolChange: (protocol: ApiProtocol) => void;
   onApiModelChange: (model: string) => void;
+  onConfigPersist: (cfg: AppConfig) => Promise<void> | void;
+  onRefreshAgents: () => Promise<AgentInfo[]> | AgentInfo[];
   // Quick theme switch invoked from the avatar-popover dropdown so the
   // user can flip light/dark/system without opening the full Settings
   // dialog. Persistence happens in `App`; this component just forwards.
@@ -105,8 +107,9 @@ interface Props {
     locale?: string,
   ) => Promise<PluginShareProjectOutcome>;
   onImportClaudeDesign: (file: File) => Promise<void> | void;
-  onImportFolder?: (baseDir: string) => Promise<boolean> | boolean | Promise<void> | void;
-  onImportFolderResponse?: (response: ImportFolderResponse) => Promise<void> | void;
+  onImportFolder?: (baseDir: string) => Promise<void> | void;
+  onImportFolderResponse?: (response: OpenDesignHostProjectImportSuccess) => Promise<void> | void;
+
   // Cursor-style "Set Up Workspace" open. One workspace → one project
   // (the primary folder's project), with `metadata.workspaceRoots`
   // recording every folder root. See `EntryShell`'s prop for details.
@@ -121,22 +124,15 @@ interface Props {
   onRenameProject: (id: string, name: string) => void;
   onChangeDefaultDesignSystem: (id: string) => void;
   onCreateDesignSystem?: () => void;
+  renderDesignSystemCreation?: (onBack: () => void) => ReactNode;
   onOpenDesignSystem?: (id: string) => void;
   onDesignSystemsRefresh?: () => Promise<void> | void;
   onPersistComposioKey: (composio: AppConfig['composio']) => Promise<void> | void;
-  onOpenSettings: (section?: 'execution' | 'media' | 'composio' | 'orbit' | 'integrations' | 'mcpClient' | 'language' | 'appearance' | 'notifications' | 'pet' | 'library' | 'about') => void;
+  onOpenSettings: (section?: 'execution' | 'media' | 'composio' | 'orbit' | 'integrations' | 'mcpClient' | 'language' | 'appearance' | 'notifications' | 'pet' | 'library' | 'about' | 'memory' | 'designSystems') => void;
+  onCompleteOnboarding: () => void;
 }
 
 const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'open-design:connector-connected';
-
-// fork-only: sessionStorage key for the "Use this prompt" hand-off used
-// by the legacy ExamplesTab / FacetParametersPanel flow. Read once by
-// ProjectView after the user picks a folder, then cleared. Kept as a
-// module-level constant so both writers and readers can't drift out of
-// sync. Re-exported here because upstream's chat-first HomeHero uses
-// the in-memory `promptHandoff` channel instead and never sets this key,
-// but the fork's ChatPane / FacetSetup flow still relies on it.
-export const PENDING_EXAMPLE_KEY = 'open-design:pending-example';
 
 export function isTrustedConnectorCallbackOrigin(origin: string, currentOrigin?: string): boolean {
   const expectedOrigin = currentOrigin ?? (typeof window === 'undefined' ? '' : window.location.origin);
@@ -270,6 +266,8 @@ export function EntryView({
   onAgentModelChange,
   onApiProtocolChange,
   onApiModelChange,
+  onConfigPersist,
+  onRefreshAgents,
   onThemeChange,
   skillsLoading = false,
   designSystemsLoading = false,
@@ -287,10 +285,12 @@ export function EntryView({
   onRenameProject,
   onChangeDefaultDesignSystem,
   onCreateDesignSystem,
+  renderDesignSystemCreation,
   onOpenDesignSystem,
   onDesignSystemsRefresh,
   onPersistComposioKey,
   onOpenSettings,
+  onCompleteOnboarding,
 }: Props) {
   const [connectors, setConnectors] = useState<ConnectorDetail[]>([]);
   const [connectorsLoading, setConnectorsLoading] = useState(false);
@@ -344,11 +344,13 @@ export function EntryView({
   return (
     <EntryShell
       skills={skills}
+      designTemplates={designTemplates}
       designSystems={designSystems}
       projects={projects}
       recentProjects={recentProjects}
       recentHomeDir={recentHomeDir}
       templates={templates}
+      onDeleteTemplate={onDeleteTemplate}
       promptTemplates={promptTemplates}
       defaultDesignSystemId={defaultDesignSystemId}
       connectors={connectors}
@@ -366,6 +368,8 @@ export function EntryView({
       onAgentModelChange={onAgentModelChange}
       onApiProtocolChange={onApiProtocolChange}
       onApiModelChange={onApiModelChange}
+      onConfigPersist={onConfigPersist}
+      onRefreshAgents={onRefreshAgents}
       onThemeChange={onThemeChange}
       onCreateProject={onCreateProject}
       onCreatePluginShareProject={onCreatePluginShareProject}
@@ -379,10 +383,12 @@ export function EntryView({
       onRenameProject={onRenameProject}
       onChangeDefaultDesignSystem={onChangeDefaultDesignSystem}
       onCreateDesignSystem={onCreateDesignSystem}
+      renderDesignSystemCreation={renderDesignSystemCreation}
       onOpenDesignSystem={onOpenDesignSystem}
       onDesignSystemsRefresh={onDesignSystemsRefresh}
       onPersistComposioKey={onPersistComposioKey}
       onOpenSettings={onOpenSettings}
+      onCompleteOnboarding={onCompleteOnboarding}
     />
   );
 }

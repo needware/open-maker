@@ -25,7 +25,6 @@ import {
   SettingsDialog,
   type SettingsSection,
 } from './components/SettingsDialog';
-import { PrivacyConsentModal } from './components/PrivacyConsentModal';
 import {
   daemonIsLive,
   fetchAppVersionInfo,
@@ -59,6 +58,7 @@ import {
   createPluginShareProject,
   deleteProject as deleteProjectApi,
   deleteTemplate,
+  getProject,
   importClaudeDesignZip,
   listProjects,
   listRecentProjects,
@@ -71,6 +71,7 @@ import type {
   PluginShareAction,
   PluginShareProjectOutcome,
 } from './state/projects';
+import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
 import {
   switchApiProtocolConfig,
   updateCurrentApiProtocolConfig,
@@ -298,8 +299,6 @@ export function App() {
   // {active:false} if this hasn't run.
   const activeProjectId = route.kind === 'project' ? route.projectId : null;
   const activeFileName = route.kind === 'project' ? route.fileName : null;
-  const showPrivacyConsent =
-    daemonConfigLoaded && config.privacyDecisionAt == null && !settingsOpen;
   useEffect(() => {
     const body = activeProjectId
       ? { projectId: activeProjectId, fileName: activeFileName }
@@ -459,10 +458,10 @@ export function App() {
 
           // Pop the onboarding modal only on the first run. Once the user
           // has saved or skipped past it once, we trust their stored config
-          // and let them re-open Settings explicitly via the env pill. Hold
-          // the welcome modal until the privacy decision is resolved; the
-          // installation id can rotate later without re-opening the banner.
-          if (!next.onboardingCompleted && next.privacyDecisionAt != null) {
+          // and let them re-open Settings explicitly via the env pill. The
+          // privacy choice now lives in Settings → Privacy (PrivacySection)
+          // rather than blocking the welcome surface behind a consent modal.
+          if (!next.onboardingCompleted) {
             setSettingsWelcome(true);
             setSettingsOpen(true);
           }
@@ -1013,17 +1012,22 @@ export function App() {
     [],
   );
 
-  // PR #974: on Electron, the desktop main process owns the picker and
-  // the import POST atomically (`pickAndImport`). The renderer never
-  // sees the path or the HMAC token; it just receives the same
-  // ImportFolderResponse shape that `importFolderProject` would
-  // produce on web, and the App-level state update is identical.
-  const handleImportFolderResponse = useCallback(async (result: import('@open-design/contracts').ImportFolderResponse) => {
-    setProjects((curr) => [result.project, ...curr.filter((p) => p.id !== result.project.id)]);
+  // PR #974: on desktop, the host bridge owns the picker and import POST
+  // atomically. The renderer never sees the path, token, or daemon DTO;
+  // it receives host-owned project identifiers and refreshes project state
+  // through the normal daemon API.
+  const handleImportFolderResponse = useCallback(async (result: OpenDesignHostProjectImportSuccess) => {
+    const project = await getProject(result.projectId);
+    if (project != null) {
+      setProjects((curr) => [project, ...curr.filter((p) => p.id !== project.id)]);
+    } else {
+      const list = await listProjects();
+      setProjects(list);
+    }
     navigate({
       kind: 'project',
-      projectId: result.project.id,
-      fileName: result.entryFile,
+      projectId: result.projectId,
+      fileName: null,
     });
   }, []);
 
@@ -1445,41 +1449,6 @@ export function App() {
         />
       ) : null}
       <MemoryToast onOpenMemory={() => openSettings('memory')} />
-      {/* First-run privacy consent banner. It waits for daemon config
-          hydration because privacyDecisionAt is daemon-owned and stripped
-          from localStorage. It also yields while Settings is open so the
-          floating banner never intercepts modal interactions. */}
-      {showPrivacyConsent ? (
-        <PrivacyConsentModal
-          onAccept={() => {
-            // Default opt-in: clicking "I get it" enables the same telemetry
-            // surface the previous two-button "Share usage data" path opted
-            // into. The banner footer + PrivacySection give the user a
-            // one-click path to flip everything off later.
-            const installationId = generateInstallationIdSafe();
-            void handleConfigPersist({
-              ...latestPersistedConfigRef.current,
-              installationId,
-              privacyDecisionAt: Date.now(),
-              telemetry: { metrics: true, content: true, artifactManifest: false },
-            });
-            // Hand the foreground over to the welcome modal now that the
-            // privacy decision is recorded — bootstrap deferred opening
-            // it while consent was pending.
-            if (!latestPersistedConfigRef.current.onboardingCompleted) {
-              setSettingsWelcome(true);
-              setSettingsOpen(true);
-            }
-          }}
-        />
-      ) : null}
     </>
   );
-}
-
-function generateInstallationIdSafe(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `inst-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
