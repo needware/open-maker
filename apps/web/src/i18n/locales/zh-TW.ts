@@ -267,6 +267,7 @@ export const zhTW: Dict = {
   'entry.useEverywhereTitle': '隨處使用',
   'entry.useEverywhereAria': '開啟「隨處使用」指南（CLI、MCP、HTTP、Skills）',
   'entry.navNewProject': '新建專案',
+  'entry.navOpenFolder': '開啟資料夾',
   'entry.navHome': '主頁',
   'entry.navProjects': '專案',
   'entry.navDesignSystems': '設計體系',

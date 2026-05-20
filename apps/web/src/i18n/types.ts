@@ -557,6 +557,7 @@ export interface Dict {
   'entry.useEverywhereAria': string;
   // Left nav rail (icon-only) — surface labels also serve as tooltips
   'entry.navNewProject': string;
+  'entry.navOpenFolder': string;
   'entry.navHome': string;
   'entry.navProjects': string;
   'entry.navTasks': string;

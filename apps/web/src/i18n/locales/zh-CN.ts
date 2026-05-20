@@ -293,6 +293,7 @@ export const zhCN: Dict = {
   'entry.useEverywhereTitle': '随处使用',
   'entry.useEverywhereAria': '打开「随处使用」指南（CLI、MCP、HTTP、Skills）',
   'entry.navNewProject': '新建项目',
+  'entry.navOpenFolder': '打开文件夹',
   'entry.navHome': '主页',
   'entry.navProjects': '项目',
   'entry.navTasks': '自动化',

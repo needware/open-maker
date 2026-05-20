@@ -29,6 +29,14 @@ interface Props {
   view: EntryView;
   onViewChange: (view: EntryView) => void;
   onNewProject: () => void;
+  // Fork-only entry point for the workspace folder picker. Always visible
+  // alongside "New project" so the user can land in an existing folder
+  // from any entry view (not just the chat-first HomeHero migrate rail).
+  // EntryShell wires this to handleChipFolderImport, which prefers the
+  // secure Electron pickAndImport bridge and falls back to opening the
+  // New Project modal in browser-only shells.
+  onOpenFolder?: () => void;
+  openingFolder?: boolean;
 }
 
 interface NavButtonProps {
@@ -37,10 +45,11 @@ interface NavButtonProps {
   tooltip: string;
   onClick: () => void;
   testId?: string;
+  disabled?: boolean;
   children: ReactNode;
 }
 
-function NavButton({ active, ariaLabel, tooltip, onClick, testId, children }: NavButtonProps) {
+function NavButton({ active, ariaLabel, tooltip, onClick, testId, disabled, children }: NavButtonProps) {
   return (
     <button
       type="button"
@@ -49,6 +58,7 @@ function NavButton({ active, ariaLabel, tooltip, onClick, testId, children }: Na
       aria-label={ariaLabel}
       aria-current={active ? 'page' : undefined}
       data-tooltip={tooltip}
+      disabled={disabled}
       {...(testId ? { 'data-testid': testId } : {})}
     >
       {children}
@@ -56,7 +66,7 @@ function NavButton({ active, ariaLabel, tooltip, onClick, testId, children }: Na
   );
 }
 
-export function EntryNavRail({ view, onViewChange, onNewProject }: Props) {
+export function EntryNavRail({ view, onViewChange, onNewProject, onOpenFolder, openingFolder }: Props) {
   const t = useT();
   const brandLabel = t('app.brand');
   const homeLabel = t('entry.navHome');
@@ -90,6 +100,17 @@ export function EntryNavRail({ view, onViewChange, onNewProject }: Props) {
         >
           <Icon name="plus" size={18} />
         </NavButton>
+        {onOpenFolder ? (
+          <NavButton
+            ariaLabel={t('entry.navOpenFolder')}
+            tooltip={t('entry.navOpenFolder')}
+            onClick={onOpenFolder}
+            testId="entry-nav-open-folder"
+            disabled={openingFolder}
+          >
+            <Icon name="import" size={18} />
+          </NavButton>
+        ) : null}
         <NavButton
           active={view === 'projects'}
           ariaLabel={t('entry.navProjects')}

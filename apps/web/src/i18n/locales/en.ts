@@ -293,6 +293,7 @@ export const en: Dict = {
   'entry.useEverywhereTitle': 'Use everywhere',
   'entry.useEverywhereAria': 'Open the Use Everywhere guide (CLI, MCP, HTTP, Skills)',
   'entry.navNewProject': 'New project',
+  'entry.navOpenFolder': 'Open folder',
   'entry.navHome': 'Home',
   'entry.navProjects': 'Projects',
   'entry.navTasks': 'Automations',

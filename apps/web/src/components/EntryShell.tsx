@@ -404,6 +404,8 @@ export function EntryShell({
           view={view}
           onViewChange={changeView}
           onNewProject={() => openNewProject()}
+          onOpenFolder={handleChipFolderImport}
+          openingFolder={chipImporting}
         />
         <main className="entry-main entry-main--scroll">
           <div className="entry-main__topbar">
