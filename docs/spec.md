@@ -16,6 +16,7 @@ Other docs:
 - Skills protocol → [`skills-protocol.md`](skills-protocol.md)
 - Agent adapters → [`agent-adapters.md`](agent-adapters.md)
 - Modes → [`modes.md`](modes.md)
+- Automations self-evolution → [`../specs/current/automation-self-evolution.md`](../specs/current/automation-self-evolution.md)
 - References & credits → [`references.md`](references.md)
 - Roadmap → [`roadmap.md`](roadmap.md)
 
@@ -46,24 +47,23 @@ The differentiation is not "yet another design generator." It is **an integratio
 
 ## 4. User scenarios
 
-Every scenario starts the same way: **the user opens a folder.** That folder is the project (see [`rfc-drafts/project-as-unit.md`](rfc-drafts/project-as-unit.md)); each generation produces a new *facet* under `<project-root>/artifacts/<facet-id>/`. Sources, `DESIGN.md`, and craft come from the project root and are inherited by every facet — no per-run "attach a knowledge base" step.
-
 ### S1 — "Give me a prototype"
-User opens an existing folder (or creates one). Types *"Airbnb-style search page, use our internal design system"*. OD picks `prototype-skill`, resolves the project's `DESIGN.md` and any active sources, dispatches to Claude Code with the brief, streams tool calls into the UI, writes to `artifacts/prototype-search/`, and renders the resulting HTML in an iframe preview. User clicks an element, drops a comment, the agent rewrites just that region.
+User opens the web app, types *"Airbnb-style search page, use our internal design system"*, OD picks the `prototype-skill`, resolves the user's `DESIGN.md`, dispatches to Claude Code with both files plus the brief, streams tool calls into the UI, and renders the resulting HTML in an iframe preview. User clicks an element, drops a comment, the agent rewrites just that region.
 
 ### S2 — "Make me a deck"
-Same project; user says *"8-slide magazine-style pitch deck for my seed round"*. OD routes to `deck-skill` (a fork of [`guizang-ppt-skill`][guizang]). Compose includes a sibling-facet summary of the existing prototype so the deck stays consistent in headline / voice. Output is a single-file HTML deck under `artifacts/deck-pitch/`; preview is the deck itself with arrow-key navigation; export is PDF/PPTX.
+User says *"8-slide magazine-style pitch deck for my seed round"*. OD routes to `deck-skill` (a fork of [`guizang-ppt-skill`][guizang]). Output is a single-file HTML deck; preview is the deck itself with arrow-key navigation; export is PDF/PPTX.
 
 ### S3 — "Start from a template"
-User picks "SaaS landing — Stripe-ish" from the gallery. Template is a pre-filled artifact bundle plus a `DESIGN.md` reference; OD copies it into `artifacts/template-saas/` and the agent only fills content. Structure is already there. Fastest path; useful for users who don't want to prompt at all.
+User picks "SaaS landing — Stripe-ish" from a gallery. Template is a pre-filled artifact bundle plus a `DESIGN.md` reference. Agent only fills content; structure is already there. This is the fastest mode — useful for users who don't want to prompt at all.
 
 ### S4 — "Set up our design system"
-User uploads a screenshot, brand guide PDF, or Figma link. OD runs `design-system-skill` which produces a `DESIGN.md` at the project root following the 9-section format. From this point on every subsequent facet (prototype, deck, template) in the project picks up the tokens automatically.
+User uploads a screenshot, brand guide PDF, or Figma link. OD runs `design-system-skill` which produces a `DESIGN.md` following the 9-section format. That file is then referenced by every subsequent generation — prototypes, decks, templates all pick up the tokens.
 
-### S5 — "Generate from my docs"
-User opens a folder that already contains a `docs/` subdirectory (or any of `sources/`, `content/`, `knowledge/`, `wiki/`). OD detects it as the project's source automatically and surfaces a `📚 docs-driven` chip in the run header. Subsequent prototype / deck / template generations read the source ToC plus targeted files via the agent's `Read` tool, keep facts and product names anchored to the docs, and (when the active skill or any source declares `ground: true`) refuse to invent claims not present in sources. The open-maker repository itself is a working example: open this repo as a project, and `docs/` is the source out of the box.
+### S5 — "Let the design agent evolve"
+User connects sources such as GitHub, Notion, Drive, Slack, or a local folder, then picks an Automation template like "Ingest into memory tree," "Extract design system," or "Crystallize this run into a skill." OD canonicalizes the source, optionally compresses it, proposes memory / skill / design-system changes, and only applies them after the configured review policy. Future agent runs consume those accepted nodes automatically.
 
-Scenarios S1–S4 map onto the four modes in [`modes.md`](modes.md). S5 is not a fifth mode — it's any of the four modes running inside a project that has sources.
+The first four scenarios map 1:1 to the four modes in [`modes.md`](modes.md).
+The fifth is the cross-product loop described in [`automation-self-evolution.md`](../specs/current/automation-self-evolution.md).
 
 ## 5. High-level modules
 
@@ -95,6 +95,8 @@ Module responsibilities:
 - **Skill registry** — scans `~/.claude/skills/`, `./skills/`, and `./.claude/skills/`; merges and exposes a typed catalog.
 - **Artifact store** — project-scoped folder (default `./.od/`) holding generated files, version snapshots (git-friendly), and per-artifact metadata.
 - **Design-system resolver** — loads the active `DESIGN.md`, injects it as skill context.
+- **Automations** — templates that orchestrate schedules, connectors, ingestion, memory updates, skill crystallization, design-system extraction, token compression, and review gates; source packets enter through the Automations page, `/api/automation-ingestions`, and `od automation source`, while evolution proposals are reviewable through `/api/automation-proposals` and `od automation proposal`.
+- **Memory / evolution store** — editable Markdown-backed memory tree exposed through Settings, `/api/memory/tree`, and `od memory tree`; accepted tree nodes feed future daemon and BYOK/API-mode agent prompts, and accepted proposals can write reviewed memory, skill, and design-system drafts into user-owned runtime roots.
 - **Preview renderer** — sandboxed iframe with vendored React + Babel for JSX artifacts; plain iframe for HTML; PDF via the daemon's headless Chrome.
 - **Export pipeline** — HTML (inlined), PDF, PPTX, ZIP, Markdown.
 
