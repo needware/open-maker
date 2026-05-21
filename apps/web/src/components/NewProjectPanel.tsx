@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createTabToTracking } from '@open-design/contracts/analytics';
 import {
   isOpenDesignHostAvailable,
@@ -2287,7 +2288,19 @@ function MediaModelCards({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
+  // Popover is portalled to document.body so it can escape the
+  // `.newproj-body` scroll container's overflow clipping. Position is
+  // recomputed from the trigger's bounding rect on open + scroll/resize.
+  const [popPos, setPopPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    placement: 'below' | 'above';
+  } | null>(null);
 
   // Group models by provider once. The trigger row needs the same provider
   // metadata (label + status) to render the selected model's caption, so we
@@ -2362,7 +2375,11 @@ function MediaModelCards({
   useEffect(() => {
     if (!open) return;
     function onPointer(e: MouseEvent) {
-      if (wrapRef.current?.contains(e.target as Node)) return;
+      const target = e.target as Node;
+      // Popover is portalled to document.body, so the trigger's wrapRef
+      // does not contain it — also accept clicks inside `popoverRef`.
+      if (wrapRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
       setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
@@ -2378,6 +2395,48 @@ function MediaModelCards({
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  const updatePopPos = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const gap = 6;
+    const viewportPad = 12;
+    const below = window.innerHeight - rect.bottom - viewportPad;
+    const above = rect.top - viewportPad;
+    // Drop up when there is materially more room above than below; otherwise
+    // anchor below the trigger and let max-height absorb whatever remains.
+    const placement: 'below' | 'above' = below < 200 && above > below ? 'above' : 'below';
+    const maxHeight = Math.max(180, Math.min(420, (placement === 'above' ? above : below) - gap));
+    setPopPos({
+      top: placement === 'above' ? Math.max(viewportPad, rect.top - maxHeight - gap) : rect.bottom + gap,
+      left: rect.left,
+      width: Math.max(rect.width, 320),
+      maxHeight,
+      placement,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPopPos(null);
+      return;
+    }
+    updatePopPos();
+  }, [open, updatePopPos]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onScrollOrResize = () => updatePopPos();
+    // capture: true picks up scroll events from `.newproj-body` (the
+    // overflow-y: auto container that was clipping the inline popover).
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open, updatePopPos]);
 
   function pick(modelId: string) {
     onChange(modelId);
@@ -2396,10 +2455,86 @@ function MediaModelCards({
       : `${selected.group.providerLabel} · ${selected.model.hint}`
     : t('newproj.modelMissingSub');
 
+  const popover =
+    open && popPos ? (
+      <div
+        ref={popoverRef}
+        className={`ds-picker-popover ds-picker-popover-portal model-picker-popover${
+          popPos.placement === 'above' ? ' placement-above' : ''
+        }`}
+        role="listbox"
+        style={{
+          position: 'fixed',
+          top: popPos.top,
+          left: popPos.left,
+          width: popPos.width,
+          maxHeight: popPos.maxHeight,
+        }}
+      >
+        <div className="ds-picker-head">
+          <input
+            ref={searchRef}
+            data-testid="model-picker-search"
+            className="ds-picker-search"
+            placeholder={t('newproj.modelSearch')}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <div className="ds-picker-list">
+          {totalMatches === 0 ? (
+            <div className="ds-picker-empty">{t('newproj.modelEmpty')}</div>
+          ) : (
+            filteredGroups.map((group) => (
+              <div className="ds-picker-group" key={group.providerId}>
+                <div className="ds-picker-group-head">
+                  <span>{group.providerLabel}</span>
+                  <span className={`newproj-provider-badge ${group.status}`}>
+                    {group.status === 'configured'
+                      ? 'Configured'
+                      : group.status === 'integrated'
+                        ? 'Integrated'
+                        : 'Unsupported'}
+                  </span>
+                </div>
+                {group.models.map((model) => {
+                  const active = value === model.id;
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      data-testid={`model-picker-option-${model.id}`}
+                      className={`ds-picker-item${active ? ' active' : ''}`}
+                      onClick={() => pick(model.id)}
+                    >
+                      <span className="ds-picker-item-text">
+                        <span className="ds-picker-item-title">
+                          {model.label}
+                          {model.default ? (
+                            <span className="ds-picker-item-badge">
+                              {t('newproj.modelRecommended')}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="ds-picker-item-sub">{model.hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div className="newproj-section ds-picker model-picker" ref={wrapRef}>
       <label className="newproj-label">{label}</label>
       <button
+        ref={triggerRef}
         type="button"
         data-testid="model-picker-trigger"
         className={`ds-picker-trigger${open ? ' open' : ''}${selected ? '' : ' empty'}`}
@@ -2418,66 +2553,9 @@ function MediaModelCards({
           style={{ transform: open ? 'rotate(180deg)' : undefined }}
         />
       </button>
-      {open ? (
-        <div className="ds-picker-popover" role="listbox">
-          <div className="ds-picker-head">
-            <input
-              ref={searchRef}
-              data-testid="model-picker-search"
-              className="ds-picker-search"
-              placeholder={t('newproj.modelSearch')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <div className="ds-picker-list">
-            {totalMatches === 0 ? (
-              <div className="ds-picker-empty">{t('newproj.modelEmpty')}</div>
-            ) : (
-              filteredGroups.map((group) => (
-                <div className="ds-picker-group" key={group.providerId}>
-                  <div className="ds-picker-group-head">
-                    <span>{group.providerLabel}</span>
-                    <span className={`newproj-provider-badge ${group.status}`}>
-                      {group.status === 'configured'
-                        ? 'Configured'
-                        : group.status === 'integrated'
-                          ? 'Integrated'
-                          : 'Unsupported'}
-                    </span>
-                  </div>
-                  {group.models.map((model) => {
-                    const active = value === model.id;
-                    return (
-                      <button
-                        key={model.id}
-                        type="button"
-                        role="option"
-                        aria-selected={active}
-                        data-testid={`model-picker-option-${model.id}`}
-                        className={`ds-picker-item${active ? ' active' : ''}`}
-                        onClick={() => pick(model.id)}
-                      >
-                        <span className="ds-picker-item-text">
-                          <span className="ds-picker-item-title">
-                            {model.label}
-                            {model.default ? (
-                              <span className="ds-picker-item-badge">
-                                {t('newproj.modelRecommended')}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="ds-picker-item-sub">{model.hint}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : null}
+      {popover && typeof document !== 'undefined'
+        ? createPortal(popover, document.body)
+        : null}
     </div>
   );
 }

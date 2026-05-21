@@ -5987,12 +5987,11 @@ a.avatar-item:visited {
   /* The parent `.newproj` is `overflow: hidden`; the card needs to be the
      scroll container so taller form variants (image/media tabs, validation
      messages, compact-height windows) stay reachable inside the sidebar.
-     `flex: 0 1 auto` keeps the card at its natural content height when the
-     form is short (so there's no big white void at the bottom of the
-     card), but lets `flex-shrink: 1` collapse it down to the available
-     space when content is long — at which point `overflow-y: auto` takes
-     over and the body scrolls. */
-  flex: 0 1 auto;
+     `flex: 1 1 auto` fills the available height so the bordered card
+     reaches down to the footer regardless of how short the current form
+     variant is — `min-height: 0` + `overflow-y: auto` still let it scroll
+     when content overflows. Form rows stay top-anchored inside the card. */
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
 }
@@ -25960,12 +25959,16 @@ body.desktop-pet-shell .pet-task-item {
   color: var(--text-muted);
 }
 .model-picker .ds-picker-trigger { min-height: 44px; }
-.model-picker .ds-picker-popover { min-width: 320px; }
-.model-picker .ds-picker-list { padding: 6px; }
-.model-picker .ds-picker-item { padding: 8px 10px; }
-.model-picker .ds-picker-item-title { font-size: 13px; font-weight: 500; }
-.model-picker .ds-picker-item-sub { font-size: 11.5px; }
-.model-picker .ds-picker-item .ds-picker-item-badge {
+/* Model-picker popover is portalled to <body> to escape `.newproj-body`'s
+   overflow-y: auto clipping context. Once portalled, descendant selectors
+   on `.model-picker` no longer match, so the styles below are scoped to
+   `.model-picker-popover` instead. */
+.model-picker-popover { min-width: 320px; }
+.model-picker-popover .ds-picker-list { padding: 6px; }
+.model-picker-popover .ds-picker-item { padding: 8px 10px; }
+.model-picker-popover .ds-picker-item-title { font-size: 13px; font-weight: 500; }
+.model-picker-popover .ds-picker-item-sub { font-size: 11.5px; }
+.model-picker-popover .ds-picker-item .ds-picker-item-badge {
   font-size: 9px;
   padding: 1px 5px;
   background: var(--accent-tint);
@@ -25973,7 +25976,7 @@ body.desktop-pet-shell .pet-task-item {
   border-radius: 4px;
   margin-left: 6px;
 }
-.model-picker .ds-picker-group-head {
+.model-picker-popover .ds-picker-group-head {
   position: sticky;
   top: 0;
   background: var(--bg-panel);
@@ -25981,6 +25984,19 @@ body.desktop-pet-shell .pet-task-item {
   min-height: 32px;
   z-index: 1;
   border-bottom: 1px solid var(--border);
+}
+/* Portal-mode popover: inline `position: fixed` + computed top/left/maxHeight
+   come from the component, so reset the base `.ds-picker-popover`
+   absolute-positioning rules and let the list flex inside the popover's own
+   maxHeight (the default 320px list cap is no longer needed). */
+.ds-picker-popover-portal {
+  right: auto;
+  animation: ds-pop-in 140ms cubic-bezier(0.2, 0, 0.2, 1);
+}
+.ds-picker-popover-portal .ds-picker-list {
+  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .palette-tweaks-anchor { position: relative; display: inline-flex; }
