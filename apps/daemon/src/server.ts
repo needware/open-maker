@@ -3290,14 +3290,15 @@ export async function startServer({
         listMemoryEntries(RUNTIME_DATA_DIR),
       ]);
       res.json({
-        authorizeUrl: result.authorizeUrl,
-        state: result.state,
-        redirectUri,
+        enabled: config.enabled,
+        chatExtractionEnabled: config.chatExtractionEnabled,
+        rootDir: memoryDir(RUNTIME_DATA_DIR),
+        index,
+        entries,
+        extraction: maskMemoryExtractionConfig(config.extraction),
       });
     } catch (err) {
-      const msg = err && err.message ? err.message : String(err);
-      console.error(`[mcp-oauth] start failed serverId=${serverId}:`, msg);
-      res.status(502).json({ error: msg });
+      res.status(500).json({ error: String(err) });
     }
   });
 
